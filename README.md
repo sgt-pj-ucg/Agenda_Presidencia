@@ -1,25 +1,18 @@
-# Agenda Presidenta — bienvenida premium
+# Agenda Presidenta — bienvenida premium con mayor duración
 
-Proyecto de prueba independiente de la versión estable.
+## Ajuste aplicado
 
-## Nueva experiencia de inicio
+La pantalla de inicio permanece visible aproximadamente **2,4 segundos** antes de desaparecer suavemente.
 
-Al abrir la aplicación aparece una bienvenida institucional breve:
+- Permite leer “Agenda Presidenta Gloria Negroni”.
+- Mantiene visible la identificación de la Corte.
+- La agenda continúa cargando en segundo plano.
+- El tiempo máximo de respaldo es de 3,2 segundos.
+- En teléfonos con “reducir movimiento” permanece cerca de 0,9 segundos.
 
-- fondo adaptado al modo claro u oscuro;
-- ícono de la aplicación con aparición suave;
-- Agenda Presidenta Gloria Negroni;
-- identificación de la Corte de Apelaciones de La Serena;
-- línea de progreso dorada discreta;
-- salida automática cuando la agenda está lista.
+## Actualización
 
-La animación dura aproximadamente 0,8 segundos y nunca bloquea la interfaz por más de 1,6 segundos. La agenda comienza a cargar inmediatamente detrás de la bienvenida.
-
-El sistema respeta la preferencia del teléfono de reducir movimiento.
-
-## Archivos que deben subirse
-
-Reemplaza todo el contenido del repositorio de prueba con:
+Sube nuevamente todo el contenido de esta carpeta al repositorio:
 
 - `index.html`
 - `styles.css`
@@ -28,6 +21,8 @@ Reemplaza todo el contenido del repositorio de prueba con:
 - `manifest.webmanifest`
 - carpeta `icons/`
 
-No es necesario modificar `Code.gs`.
+Después de publicar:
 
-Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para que el nuevo service worker active la experiencia de inicio.
+1. Cierra completamente la aplicación.
+2. Vuelve a abrirla.
+3. Si aún aparece la versión anterior, elimina el acceso directo e instálala nuevamente desde Chrome.

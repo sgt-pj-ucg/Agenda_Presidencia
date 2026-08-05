@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · bienvenida premium y carga inmediata
+// Agenda Presidencia · bienvenida premium con tiempo de lectura
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -1124,7 +1124,7 @@ function dismissLaunchScreen(){
   launchDismissRequested=true;
 
   const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const minimumVisibleTime=reduceMotion?120:760;
+  const minimumVisibleTime=reduceMotion?900:2400;
   const elapsed=performance.now()-launchStartedAt;
   const delay=Math.max(0,minimumVisibleTime-elapsed);
 
@@ -1135,7 +1135,7 @@ function dismissLaunchScreen(){
 }
 
 // Respaldo: incluso con una red lenta, la interfaz queda disponible rápidamente.
-window.setTimeout(dismissLaunchScreen,1600);
+window.setTimeout(dismissLaunchScreen,3200);
 
 
 async function loadData({silent=false}={}) {
