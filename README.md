@@ -1,25 +1,21 @@
-# Agenda Presidenta — resumen equilibrado y calendario estable
+# Agenda Presidenta — bienvenida premium
 
 Proyecto de prueba independiente de la versión estable.
 
-## Cambios de esta entrega
+## Nueva experiencia de inicio
 
-- El bloque de fecha, saludo y resumen diario aumenta moderadamente su tamaño.
-- Conserva el comportamiento adaptativo: se repliega al bajar en Calendario y reaparece al volver arriba.
-- El calendario usa siempre seis filas, por lo que mantiene exactamente la misma altura al cambiar de mes.
-- Seis filas son necesarias: algunos meses no caben completos en cinco.
-- La navegación rápida conserva únicamente:
-  - Hoy
-  - Mañana
-  - Semana
-- Se elimina el botón manual de actualización.
-- La agenda se sincroniza:
-  - al abrir;
-  - al volver a la aplicación después de dos minutos;
-  - al recuperar la conexión.
-- El gesto de actualizar del navegador sigue disponible.
-- El selector claro/oscuro es más grande, limpio y moderno.
-- Se conserva la normalización de fechas y el orden cronológico de la entrega anterior.
+Al abrir la aplicación aparece una bienvenida institucional breve:
+
+- fondo adaptado al modo claro u oscuro;
+- ícono de la aplicación con aparición suave;
+- Agenda Presidenta Gloria Negroni;
+- identificación de la Corte de Apelaciones de La Serena;
+- línea de progreso dorada discreta;
+- salida automática cuando la agenda está lista.
+
+La animación dura aproximadamente 0,8 segundos y nunca bloquea la interfaz por más de 1,6 segundos. La agenda comienza a cargar inmediatamente detrás de la bienvenida.
+
+El sistema respeta la preferencia del teléfono de reducir movimiento.
 
 ## Archivos que deben subirse
 
@@ -34,4 +30,4 @@ Reemplaza todo el contenido del repositorio de prueba con:
 
 No es necesario modificar `Code.gs`.
 
-Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para activar la nueva caché.
+Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para que el nuevo service worker active la experiencia de inicio.

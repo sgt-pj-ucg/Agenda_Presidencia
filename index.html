@@ -22,11 +22,31 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="preload" as="image" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=507" />
+  <link rel="stylesheet" href="styles.css?v=508" />
 </head>
 <body>
+
+<!-- Bienvenida de inicio: breve, institucional y no bloquea la carga de datos -->
+<div class="launch-screen" id="launchScreen" role="status" aria-label="Iniciando Agenda Presidenta">
+  <div class="launch-ambient launch-ambient-one" aria-hidden="true"></div>
+  <div class="launch-ambient launch-ambient-two" aria-hidden="true"></div>
+  <div class="launch-content">
+    <div class="launch-mark" aria-hidden="true">
+      <img src="icons/icon-192.png" alt="" />
+      <span class="launch-halo"></span>
+    </div>
+    <div class="launch-copy">
+      <span class="launch-kicker">AGENDA</span>
+      <strong class="launch-title">Presidenta Gloria Negroni</strong>
+      <span class="launch-subtitle">Corte de Apelaciones de La Serena</span>
+    </div>
+    <div class="launch-progress" aria-hidden="true"><span></span></div>
+  </div>
+</div>
+
 
 <!-- Cabecera ejecutiva -->
 <header class="app-header" id="appHeader">
@@ -285,6 +305,6 @@
 <div class="toast" id="toast"></div>
 
 
-<script src="app.js?v=507" defer></script>
+<script src="app.js?v=508" defer></script>
 </body>
 </html>

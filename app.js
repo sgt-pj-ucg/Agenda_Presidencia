@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · calendario estable, navegación esencial y sincronización automática
+// Agenda Presidencia · bienvenida premium y carga inmediata
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -1114,6 +1114,30 @@ themeToggle.addEventListener('click', () => {
 syncThemeControls();
 
 
+// Bienvenida de inicio. La agenda carga detrás y la animación nunca bloquea más de 1,6 s.
+const launchScreen=document.getElementById('launchScreen');
+const launchStartedAt=performance.now();
+let launchDismissRequested=false;
+
+function dismissLaunchScreen(){
+  if(!launchScreen||launchDismissRequested) return;
+  launchDismissRequested=true;
+
+  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const minimumVisibleTime=reduceMotion?120:760;
+  const elapsed=performance.now()-launchStartedAt;
+  const delay=Math.max(0,minimumVisibleTime-elapsed);
+
+  window.setTimeout(()=>{
+    launchScreen.classList.add('leaving');
+    window.setTimeout(()=>launchScreen.remove(),reduceMotion?160:460);
+  },delay);
+}
+
+// Respaldo: incluso con una red lenta, la interfaz queda disponible rápidamente.
+window.setTimeout(dismissLaunchScreen,1600);
+
+
 async function loadData({silent=false}={}) {
   if(!silent) document.getElementById('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando agenda…</div>';
   try {
@@ -1129,16 +1153,17 @@ async function loadData({silent=false}={}) {
         {FECHA:key(4),'DÍA':'',HORA:'15:30',MODALIDAD:'Presencial',ACTIVIDAD:'Ceremonia de juramento',LUGAR:'Tercera Sala',PARTICIPANTES:'Invitados',ESTADO:'Confirmada',_row:6}
       ];
       lastSuccessfulLoadAt=Date.now();
-      updateHeaderStats();buildTabs();render();return;
+      updateHeaderStats();buildTabs();render();dismissLaunchScreen();return;
     }
     const response=await fetch(`${CSV_URL}&t=${Date.now()}`,{cache:'no-store'});
     if(!response.ok) throw new Error('No fue posible cargar la planilla');
     const text=await response.text();
     allEvents=parseCSV(text);
     lastSuccessfulLoadAt=Date.now();
-    updateHeaderStats();buildTabs();render();
+    updateHeaderStats();buildTabs();render();dismissLaunchScreen();
     if(silent) showToast('↻ Agenda sincronizada');
   } catch(error) {
+    dismissLaunchScreen();
     if(!silent) document.getElementById('content').innerHTML='<div class="empty"><div class="icon">⚠️</div><p>Error al cargar.<br>Verifica la conexión.</p></div>';
   }
 }
