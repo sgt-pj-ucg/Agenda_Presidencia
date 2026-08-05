@@ -1841,3 +1841,282 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media (hover:hover){
   .event-card.presencial:hover,.event-card.telematica:hover,.event-card.hibrida:hover{transform:translateY(-1px);}
 }
+
+/* ==========================================================================
+   Agenda Presidenta · refinamiento móvil premium + PWA
+   ========================================================================== */
+
+/* Identidad: el nombre queda en una sola línea y sin número de versión. */
+.header-text{min-width:0;flex:1;}
+.header-text h1{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.version-pill{display:none!important;}
+
+/* El escudo conserva contraste real en ambos temas. */
+html[data-theme="dark"] .header-escudo img{
+  filter:brightness(0) invert(1);
+  opacity:1;
+}
+html[data-theme="light"] .header-escudo{
+  background:#edf2f7;
+  border-color:#c7d2df;
+}
+html[data-theme="light"] .header-escudo img{
+  filter:brightness(0) saturate(100%) invert(18%) sepia(19%) saturate(1388%) hue-rotate(177deg) brightness(87%) contrast(91%);
+  opacity:1;
+}
+
+/* El micrófono debe distinguirse del fondo de búsqueda. */
+.voice-btn{
+  background:#1e3150;
+  color:#9bc7f4;
+  border-color:#48698d;
+  box-shadow:0 4px 12px rgba(4,12,28,.22);
+}
+html[data-theme="light"] .voice-btn{
+  background:#ffffff;
+  color:#174f7d;
+  border-color:#a9bdd2;
+  box-shadow:0 4px 12px rgba(39,67,98,.13);
+}
+.voice-btn svg{stroke-width:2.35;}
+.voice-btn.listening,
+html[data-theme="light"] .voice-btn.listening{
+  background:#8b3e46;
+  color:#fff;
+  border-color:#b96b73;
+}
+
+/* Ausencia: señal fina y reconocible, sin bisel grueso. */
+.cal-cell.has-absence:not(.selected){
+  color:var(--absence-cell-text);
+  background:color-mix(in srgb,var(--v5-absence) 11%,var(--v5-surface));
+  border:1px solid color-mix(in srgb,var(--v5-absence) 58%,var(--v5-line));
+  box-shadow:none;
+}
+.cal-cell.has-absence::before{
+  content:"";
+  position:absolute;
+  top:4px;
+  left:50%;
+  right:auto;
+  width:13px;
+  height:2px;
+  border-radius:999px;
+  transform:translateX(-50%);
+  background:var(--v5-absence);
+  opacity:.86;
+}
+.cal-cell.has-absence::after{
+  content:"";
+  position:absolute;
+  top:6px;
+  right:6px;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:var(--v5-absence);
+  box-shadow:none;
+}
+.cal-cell.has-absence.selected{
+  color:var(--v5-text);
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--v5-brand) 17%,transparent),transparent 66%),
+    color-mix(in srgb,var(--v5-absence) 9%,var(--v5-surface));
+  border-color:var(--v5-brand);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--v5-absence) 28%,transparent);
+}
+html[data-theme="light"] .cal-cell.has-absence.selected{
+  color:#3d3423;
+  background:linear-gradient(135deg,#fff2cc 0 58%,#eef2f7 100%);
+}
+.legend-absence-cell{
+  width:13px;
+  height:13px;
+  display:inline-block;
+  border-radius:4px;
+  background:color-mix(in srgb,var(--v5-absence) 12%,var(--v5-surface));
+  border:1px solid color-mix(in srgb,var(--v5-absence) 62%,var(--v5-line));
+  box-shadow:none;
+  position:relative;
+}
+.legend-absence-cell::after{
+  content:"";
+  position:absolute;
+  top:2px;
+  left:50%;
+  width:6px;
+  height:1.5px;
+  border-radius:999px;
+  transform:translateX(-50%);
+  background:var(--v5-absence);
+}
+
+/* El calendario admite navegación de meses por deslizamiento horizontal. */
+.cal-grid{
+  touch-action:pan-y;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* En teléfono, la identidad y el resumen ocupan lo mínimo imprescindible. */
+@media (max-width:759px){
+  .app-header{
+    padding:max(4px,env(safe-area-inset-top)) 8px 4px;
+  }
+  .header-top{
+    min-height:31px;
+    gap:6px;
+    margin-bottom:0;
+  }
+  .header-escudo{
+    width:28px;
+    height:28px;
+    border-radius:8px;
+  }
+  .header-escudo img{
+    width:19px;
+    height:19px;
+  }
+  .agenda-label{
+    font-size:5.5px;
+    letter-spacing:1.25px;
+    margin-bottom:0;
+  }
+  .header-text h1{
+    font-size:11.5px;
+    line-height:1.05;
+    letter-spacing:0;
+  }
+  .header-actions{gap:4px;}
+  .theme-toggle{
+    width:48px;
+    height:28px;
+    border-radius:9px;
+  }
+  .theme-toggle::before{
+    width:21px;
+    height:21px;
+    top:3px;
+    left:3px;
+  }
+  html[data-theme="dark"] .theme-toggle::before{transform:translateX(21px);}
+  .theme-icon{font-size:10px;}
+  .header-refresh{
+    width:28px;
+    height:28px;
+    border-radius:9px;
+    font-size:15px;
+  }
+
+  .executive-brief{
+    min-height:30px;
+    margin-top:3px;
+    padding:4px 5px 4px 8px;
+    gap:5px;
+    border-radius:10px;
+  }
+  .brief-copy{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    min-width:0;
+    overflow:hidden;
+  }
+  .brief-kicker{display:none;}
+  .brief-title{
+    flex:0 0 auto;
+    font-size:10px;
+    line-height:1;
+    white-space:nowrap;
+  }
+  .brief-subtitle{
+    flex:1 1 auto;
+    min-width:0;
+    font-size:8.5px;
+    line-height:1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .brief-calendar-button{
+    width:24px;
+    height:24px;
+    flex:0 0 24px;
+    border-radius:7px;
+  }
+  .brief-calendar-button svg{width:13px;height:13px;}
+
+  body[data-view="calendario"] .executive-brief{display:none!important;}
+  body[data-view="calendario"] .app-header{padding-bottom:4px;}
+
+  .content{padding:6px 7px 16px;}
+  .updated-bar{margin-bottom:4px;font-size:8px;}
+  .calendar-card{
+    padding:8px 7px 7px;
+    border-radius:17px;
+  }
+  .cal-header{
+    align-items:center;
+    margin-bottom:7px;
+    gap:7px;
+  }
+  .cal-heading{gap:0;}
+  .cal-eyebrow,.cal-subtitle{display:none;}
+  .cal-title{font-size:15px;line-height:1.05;}
+  .cal-controls{gap:4px;}
+  .cal-today-btn{
+    height:30px;
+    padding:0 8px;
+    border-radius:9px;
+    font-size:9px;
+  }
+  .cal-nav-group{gap:3px;}
+  .cal-nav{
+    width:30px;
+    height:30px;
+    border-radius:9px;
+  }
+  .cal-nav svg{width:15px;height:15px;}
+  .cal-days-header{margin-bottom:3px;}
+  .cal-days-header span{font-size:8px;}
+  .cal-grid{gap:3px;}
+  .cal-cell{
+    aspect-ratio:auto;
+    min-height:38px;
+    height:38px;
+    border-radius:9px;
+    padding:2px 2px 7px;
+  }
+  .cal-day-number{font-size:11.5px;}
+  .activity-line{
+    left:5px;
+    right:5px;
+    bottom:4px;
+    height:2.5px;
+    gap:1.5px;
+  }
+  .calendar-legend{
+    padding-top:6px;
+    margin-top:3px;
+    gap:8px;
+    font-size:7.5px;
+  }
+  .legend-line{width:14px;height:2.5px;}
+  .day-panel{margin-top:8px;}
+}
+
+/* En pantallas especialmente bajas, prioriza el mes completo. */
+@media (max-width:759px) and (max-height:760px){
+  .calendar-legend{display:none;}
+  .updated-bar{display:none;}
+  .cal-cell{height:36px;min-height:36px;}
+}
+
+/* En Calendario, el buscador y la hora de sincronización no ocupan altura móvil. */
+@media (max-width:759px){
+  body[data-view="calendario"] .search-bar,
+  body[data-view="calendario"] .search-info,
+  body[data-view="calendario"] .updated-bar{
+    display:none!important;
+  }
+}

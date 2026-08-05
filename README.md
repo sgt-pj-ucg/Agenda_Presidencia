@@ -1,14 +1,35 @@
-# Agenda Presidencia 5.0.2 — refinamiento visual
+# Agenda Presidenta — entrega móvil premium e instalable
 
-Proyecto de prueba separado de la versión estable.
+Esta carpeta es independiente de la versión operativa anterior.
 
 ## Cambios principales
 
-- Encabezado móvil compacto para dar prioridad al calendario.
-- En vista Calendario se oculta el resumen ejecutivo y las pestañas dejan de ser fijas.
-- Paleta de modalidades menos saturada: verde pino, azul acero e índigo grisáceo.
-- Ausencias reconocibles por superficie gris azulada, borde lateral y sello de esquina.
-- Estados y transiciones ajustados para temas claro y oscuro.
-- Sin cambios en Google Apps Script ni en la sincronización con Google Sheets.
+- Cabecera móvil más baja.
+- Nombre “Presidenta Gloria Negroni” en una sola línea.
+- Sin número de versión visible.
+- Escudo legible en tema claro y oscuro.
+- Micrófono con contraste reforzado.
+- Deslizamiento horizontal del calendario para cambiar de mes.
+- Ausencias reconocibles con borde fino, sin bisel grueso.
+- Aplicación instalable (PWA), con íconos y apertura a pantalla completa.
 
-Reemplazar en el repositorio de prueba: `index.html`, `styles.css` y `app.js`.
+## Archivos que deben subirse a GitHub
+
+Sube todos estos archivos y carpetas a la raíz del repositorio:
+
+- `index.html`
+- `styles.css`
+- `app.js`
+- `manifest.webmanifest`
+- `service-worker.js`
+- carpeta `icons/`
+
+No es necesario modificar `Code.gs`.
+
+## Instalación en el teléfono
+
+### Android / Chrome
+Abre la aplicación publicada, entra al menú de Chrome y elige **Instalar aplicación** o **Agregar a pantalla principal**.
+
+### iPhone / Safari
+Abre la aplicación, toca **Compartir** y elige **Agregar a inicio**.

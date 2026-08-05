@@ -1,5 +1,5 @@
 
-// Agenda Presidencia 5.0.2 · interfaz móvil refinada; conserva el backend operativo
+// Agenda Presidencia · interfaz premium móvil; conserva el backend operativo
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -327,6 +327,13 @@ function moveSelectedDay(delta){
   render();
 }
 
+function moveCalendarMonth(delta){
+  const nextMonth=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+delta,1);
+  calendarDate=nextMonth;
+  selectedCalDate=new Date(nextMonth);
+  render();
+}
+
 function renderSelectedDayPanel(){
   const selected=selectedCalDate||new Date();
   const events=selectedDayEvents();
@@ -423,35 +430,49 @@ function renderCalendar() {
 }
 
 function bindCalendarInteractions(){
-  document.getElementById('calPrev')?.addEventListener('click',()=>{
-    calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);
-    selectedCalDate=new Date(calendarDate);
-    render();
-  });
-  document.getElementById('calNext')?.addEventListener('click',()=>{
-    calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);
-    selectedCalDate=new Date(calendarDate);
-    render();
-  });
+  document.getElementById('calPrev')?.addEventListener('click',()=>moveCalendarMonth(-1));
+  document.getElementById('calNext')?.addEventListener('click',()=>moveCalendarMonth(1));
   document.getElementById('calToday')?.addEventListener('click',()=>{
     const today=new Date(); today.setHours(0,0,0,0);
     selectedCalDate=today;
     calendarDate=new Date(today.getFullYear(),today.getMonth(),1);
     render();
   });
-  document.getElementById('calGrid')?.addEventListener('click',event=>{
-    const cell=event.target.closest('.cal-cell'); if(!cell?.dataset.date) return;
-    const [d,m,y]=cell.dataset.date.split('/').map(Number);
-    selectedCalDate=new Date(y,m-1,d);
-    calendarDate=new Date(y,m-1,1);
-    render();
-  });
+
+  const grid=document.getElementById('calGrid');
+  let calendarSwipeUntil=0;
+  if(grid){
+    let startX=0,startY=0;
+    grid.addEventListener('touchstart',event=>{
+      startX=event.changedTouches[0]?.clientX||0;
+      startY=event.changedTouches[0]?.clientY||0;
+    },{passive:true});
+    grid.addEventListener('touchend',event=>{
+      const endX=event.changedTouches[0]?.clientX||0;
+      const endY=event.changedTouches[0]?.clientY||0;
+      const dx=endX-startX,dy=endY-startY;
+      if(Math.abs(dx)>58&&Math.abs(dx)>Math.abs(dy)*1.2){
+        calendarSwipeUntil=Date.now()+420;
+        moveCalendarMonth(dx<0?1:-1);
+      }
+    },{passive:true});
+    grid.addEventListener('click',event=>{
+      if(Date.now()<calendarSwipeUntil) return;
+      const cell=event.target.closest('.cal-cell'); if(!cell?.dataset.date) return;
+      const [d,m,y]=cell.dataset.date.split('/').map(Number);
+      selectedCalDate=new Date(y,m-1,d);
+      calendarDate=new Date(y,m-1,1);
+      render();
+    });
+  }
+
   document.getElementById('dayPrev')?.addEventListener('click',()=>moveSelectedDay(-1));
   document.getElementById('dayNext')?.addEventListener('click',()=>moveSelectedDay(1));
   document.getElementById('emptyAddButton')?.addEventListener('click',()=>{
     openActivityModal('add');
     if(selectedCalDate) document.getElementById('fFecha').value=dateToInput(formatDateKey(selectedCalDate));
   });
+
   const panel=document.getElementById('dayPanel');
   if(panel){
     let startX=0,startY=0;
@@ -834,3 +855,13 @@ async function loadData({silent=false}={}) {
 }
 
 loadData();
+
+
+// Habilita instalación como aplicación y actualizaciones seguras del shell visual.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' }).catch(() => {
+      // La agenda sigue funcionando aunque el navegador no admita el service worker.
+    });
+  });
+}
