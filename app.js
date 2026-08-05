@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · experiencia móvil estable, dictado y selector propio de hora
+// Agenda Presidencia · calendario estable, navegación esencial y sincronización automática
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -13,6 +13,7 @@ let activeDropdown = null;
 let editingEvent = null;
 let pendingDeleteEvent = null;
 let refreshTimer = null;
+let lastSuccessfulLoadAt = 0;
 
 const CATEGORIES = [
   { id:'reuniones', label:'Reuniones', icon:'🤝', keywords:['reunión','reunion','reuniones'] },
@@ -70,18 +71,49 @@ function parseCSV(text) {
   return rows.slice(1).map((cols,idx)=>{
     const obj={_row:idx+2};
     headers.forEach((header,i)=>obj[header]=(cols[i]||'').trim());
+    obj.FECHA=normalizeDateKey(obj.FECHA);
+    obj.HORA=normalizeTimeValue(obj.HORA);
     obj.MODALIDAD=normalizeModality(obj.MODALIDAD);
     obj.ESTADO=normalizeStatus(obj.ESTADO);
     return obj;
   }).filter(e=>e.FECHA&&e.ACTIVIDAD);
 }
 
-function parseDate(str) {
-  if (!str) return null;
-  const [d,m,y]=String(str).split('/').map(Number);
-  if (!d||!m||!y) return null;
-  const date=new Date(y,m-1,d);
-  return Number.isNaN(date.getTime())?null:date;
+function normalizeDateKey(value) {
+  if (!value) return '';
+  const raw=String(value).trim();
+  let day,month,year;
+  const iso=raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:\D|$)/);
+  const local=raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:\D|$)/);
+  if (iso) [,year,month,day]=iso;
+  else if (local) [,day,month,year]=local;
+  else return '';
+  day=Number(day); month=Number(month); year=Number(year);
+  const date=new Date(year,month-1,day);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear()!==year ||
+    date.getMonth()!==month-1 ||
+    date.getDate()!==day
+  ) return '';
+  return `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
+}
+
+function parseDate(value) {
+  const canonical=normalizeDateKey(value);
+  if (!canonical) return null;
+  const [day,month,year]=canonical.split('/').map(Number);
+  return new Date(year,month-1,day);
+}
+
+function normalizeTimeValue(value) {
+  if (!value) return '';
+  const match=String(value).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  const hour=Number(match[1]);
+  const minute=Number(match[2]);
+  if (hour<0||hour>23||minute<0||minute>59) return '';
+  return `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
 }
 
 function dateToInput(str) {
@@ -125,7 +157,7 @@ function normalizeStatus(value) {
 }
 
 function eventKey(event) {
-  return `${event._row||''}|${event.FECHA||''}|${event.HORA||''}|${event.ACTIVIDAD||''}`;
+  return `${event._row||''}|${normalizeDateKey(event.FECHA)}|${normalizeTimeValue(event.HORA)}|${event.ACTIVIDAD||''}`;
 }
 
 function getStatus(event) { return normalizeStatus(event.ESTADO); }
@@ -136,16 +168,25 @@ function isSpecialActivity(event) {
 }
 
 function formatTime(value) {
-  if (!value) return '';
-  const match=String(value).match(/(\d{1,2}):(\d{2})/);
-  if (!match) return String(value);
-  return `${match[1].padStart(2,'0')}:${match[2]}`;
+  return normalizeTimeValue(value);
 }
 
 function timeToMin(value) {
-  if (!value) return -1;
-  const match=String(value).match(/(\d{1,2}):(\d{2})/);
-  return match?(Number(match[1])*60+Number(match[2])):-1;
+  const normalized=normalizeTimeValue(value);
+  if (!normalized) return null;
+  const [hour,minute]=normalized.split(':').map(Number);
+  return hour*60+minute;
+}
+
+function compareEventsChronologically(a,b) {
+  const aMinutes=timeToMin(a.HORA);
+  const bMinutes=timeToMin(b.HORA);
+  if (aMinutes===null&&bMinutes!==null) return 1;
+  if (aMinutes!==null&&bMinutes===null) return -1;
+  if (aMinutes!==null&&bMinutes!==null&&aMinutes!==bMinutes) return aMinutes-bMinutes;
+  const rowDifference=(Number(a._row)||Number.MAX_SAFE_INTEGER)-(Number(b._row)||Number.MAX_SAFE_INTEGER);
+  if (rowDifference) return rowDifference;
+  return String(a.ACTIVIDAD||'').localeCompare(String(b.ACTIVIDAD||''),'es',{sensitivity:'base'});
 }
 
 function modalityMeta(value) {
@@ -193,7 +234,7 @@ function getActiveCats() {
 }
 
 function buildTabs() {
-  const tabs=[...FIXED_TABS,...getActiveCats().map(c=>({id:c.id,label:c.label,icon:c.icon}))];
+  const tabs=[...FIXED_TABS];
   const row=document.getElementById('tabsRow');
   row.innerHTML=tabs.map(tab=>{
     const count=filterEvents(tab.id).length;
@@ -224,7 +265,7 @@ function updateExecutiveBrief(today,todayEvents) {
   const hour=new Date().getHours();
   const greeting=hour<12?'Buenos días':hour<20?'Buenas tardes':'Buenas noches';
   const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada');
-  const timed=active.filter(event=>event.HORA).slice().sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+  const timed=active.filter(event=>timeToMin(event.HORA)!==null).slice().sort(compareEventsChronologically);
   const absences=active.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event));
   document.getElementById('briefKicker').textContent=today.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('briefTitle').textContent=`${greeting}, Presidenta.`;
@@ -279,10 +320,15 @@ function renderCard(event) {
 function renderGroups(events) {
   if (!events.length) return `<div class="empty"><div class="icon">📭</div><p>No hay actividades<br>para este período</p></div>`;
   const grouped={};
-  events.forEach(event=>{ if(!grouped[event.FECHA]) grouped[event.FECHA]=[]; grouped[event.FECHA].push(event); });
+  events.forEach(event=>{
+    const key=normalizeDateKey(event.FECHA);
+    if(!key) return;
+    if(!grouped[key]) grouped[key]=[];
+    grouped[key].push(event);
+  });
   return Object.keys(grouped).sort((a,b)=>parseDate(a)-parseDate(b)).map(key=>{
     const date=parseDate(key);
-    const sorted=grouped[key].sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+    const sorted=grouped[key].slice().sort(compareEventsChronologically);
     const dayName=date?date.toLocaleDateString('es-CL',{weekday:'long'}):'';
     const dayNum=date?date.getDate():'';
     const month=date?date.toLocaleDateString('es-CL',{month:'short'}):'';
@@ -325,7 +371,7 @@ function dayStatusSegments(dayEvents){
 function selectedDayEvents(){
   if(!selectedCalDate) return [];
   const key=formatDateKey(selectedCalDate);
-  return allEvents.filter(event=>event.FECHA===key).slice().sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+  return allEvents.filter(event=>normalizeDateKey(event.FECHA)===key).slice().sort(compareEventsChronologically);
 }
 
 function moveSelectedDay(delta){
@@ -388,19 +434,23 @@ function renderCalendar() {
   });
   const eventsByDate=new Map();
   allEvents.forEach(event=>{
-    if(!eventsByDate.has(event.FECHA)) eventsByDate.set(event.FECHA,[]);
-    eventsByDate.get(event.FECHA).push(event);
+    const key=normalizeDateKey(event.FECHA);
+    if(!key) return;
+    if(!eventsByDate.has(key)) eventsByDate.set(key,[]);
+    eventsByDate.get(key).push(event);
   });
   const cells=[];
   for(let i=1;i<startDow;i++) cells.push({date:new Date(year,month,1-(startDow-i)),current:false});
   for(let day=1;day<=lastDay.getDate();day++) cells.push({date:new Date(year,month,day),current:true});
-  while(cells.length%7!==0){
+  // Seis semanas fijas: todos los meses conservan exactamente la misma altura.
+  // Cinco filas no bastan para meses que comienzan al final de la semana y tienen 31 días.
+  while(cells.length<42){
     const last=cells[cells.length-1].date;
     cells.push({date:new Date(last.getFullYear(),last.getMonth(),last.getDate()+1),current:false});
   }
   const cellsHTML=cells.map(cell=>{
     const key=formatDateKey(cell.date);
-    const dayEvents=eventsByDate.get(key)||[];
+    const dayEvents=(eventsByDate.get(key)||[]).slice().sort(compareEventsChronologically);
     const segments=dayStatusSegments(dayEvents);
     const hasAbsence=dayEvents.some(isCalendarAbsenceEvent);
     const isToday=sameDay(cell.date,today);
@@ -746,9 +796,9 @@ document.querySelectorAll('.time-shortcuts button').forEach(button=>button.addEv
 function getFormEvent() {
   const inputDate=document.getElementById('fFecha').value;
   return {
-    FECHA:inputToDate(inputDate),
+    FECHA:normalizeDateKey(inputToDate(inputDate)),
     'DÍA':dayNameFromInput(inputDate),
-    HORA:document.getElementById('fHora').value,
+    HORA:normalizeTimeValue(document.getElementById('fHora').value),
     MODALIDAD:normalizeModality(document.getElementById('fModalidad').value),
     ACTIVIDAD:document.getElementById('fActividad').value.trim(),
     LUGAR:document.getElementById('fLugar').value.trim(),
@@ -1063,7 +1113,6 @@ themeToggle.addEventListener('click', () => {
 
 syncThemeControls();
 
-document.getElementById('refreshBtn').addEventListener('click',()=>loadData());
 
 async function loadData({silent=false}={}) {
   if(!silent) document.getElementById('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando agenda…</div>';
@@ -1079,18 +1128,35 @@ async function loadData({silent=false}={}) {
         {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Feriado legal de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:5},
         {FECHA:key(4),'DÍA':'',HORA:'15:30',MODALIDAD:'Presencial',ACTIVIDAD:'Ceremonia de juramento',LUGAR:'Tercera Sala',PARTICIPANTES:'Invitados',ESTADO:'Confirmada',_row:6}
       ];
+      lastSuccessfulLoadAt=Date.now();
       updateHeaderStats();buildTabs();render();return;
     }
     const response=await fetch(`${CSV_URL}&t=${Date.now()}`,{cache:'no-store'});
     if(!response.ok) throw new Error('No fue posible cargar la planilla');
     const text=await response.text();
     allEvents=parseCSV(text);
+    lastSuccessfulLoadAt=Date.now();
     updateHeaderStats();buildTabs();render();
     if(silent) showToast('↻ Agenda sincronizada');
   } catch(error) {
     if(!silent) document.getElementById('content').innerHTML='<div class="empty"><div class="icon">⚠️</div><p>Error al cargar.<br>Verifica la conexión.</p></div>';
   }
 }
+
+
+// Sincronización automática: no requiere un botón permanente en la cabecera.
+function refreshAgendaIfStale() {
+  const twoMinutes = 2 * 60 * 1000;
+  if (!lastSuccessfulLoadAt || Date.now() - lastSuccessfulLoadAt >= twoMinutes) {
+    loadData({silent:true});
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshAgendaIfStale();
+});
+
+window.addEventListener('online', () => loadData({silent:true}));
 
 loadData();
 

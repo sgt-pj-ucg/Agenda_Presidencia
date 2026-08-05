@@ -2689,3 +2689,179 @@ html[data-theme="dark"] .time-confirm-button{color:#172036;}
 @media(prefers-reduced-motion:reduce){
   .field-mic-button.listening{animation:none;}
 }
+
+/* ==========================================================================
+   Entrega 5.0.7 · resumen protagonista, calendario estable y cabecera limpia
+   ========================================================================== */
+
+/* El botón manual fue retirado: la sincronización ocurre al abrir o retomar la app. */
+.header-refresh{display:none!important;}
+.header-actions{margin-left:auto;}
+
+/* Control claro/oscuro más moderno y con mayor área táctil. */
+.theme-toggle{
+  width:66px;
+  height:38px;
+  padding:3px;
+  border-radius:14px;
+  border:1px solid color-mix(in srgb,var(--v5-brand) 28%,var(--v5-line));
+  background:
+    linear-gradient(145deg,color-mix(in srgb,var(--v5-card) 92%,white 8%),var(--v5-card));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb,white 15%,transparent),
+    0 7px 18px rgba(5,14,30,.16);
+}
+.theme-toggle::before{
+  width:29px;
+  height:29px;
+  top:4px;
+  left:4px;
+  border-radius:10px;
+  background:linear-gradient(145deg,#fff7dc,#e6c36a);
+  box-shadow:0 3px 10px rgba(8,17,35,.24);
+}
+html[data-theme="dark"] .theme-toggle::before{
+  transform:translateX(28px);
+  background:linear-gradient(145deg,#37517a,#1f3151);
+}
+.theme-icon{
+  font-size:13px;
+  font-weight:700;
+}
+
+/* Resumen ejecutivo: aumento moderado, no invasivo. */
+.executive-brief{
+  border-color:color-mix(in srgb,var(--v5-brand) 24%,var(--v5-line));
+  box-shadow:0 10px 26px rgba(6,17,36,.10);
+}
+.brief-title{font-weight:760;}
+.brief-subtitle{max-width:62ch;}
+
+/* El calendario siempre contiene seis semanas y no cambia de altura entre meses. */
+.cal-grid{
+  grid-template-rows:repeat(6,minmax(0,1fr));
+}
+.cal-cell{
+  min-width:0;
+}
+
+/* Solo las tres búsquedas temporales esenciales. */
+.tabs-row{
+  justify-content:flex-start;
+}
+.tab{
+  flex:1 1 0;
+  justify-content:center;
+  max-width:none;
+}
+
+@media (max-width:759px){
+  .header-actions{gap:0;}
+  .theme-toggle{
+    width:62px;
+    height:36px;
+    border-radius:13px;
+  }
+  .theme-toggle::before{
+    width:27px;
+    height:27px;
+    top:4px;
+    left:4px;
+    border-radius:9px;
+  }
+  html[data-theme="dark"] .theme-toggle::before{
+    transform:translateX(26px);
+  }
+  .theme-icon{font-size:12px;}
+
+  /* Un poco más de presencia para fecha, saludo y resumen. */
+  .executive-brief{
+    min-height:64px;
+    max-height:92px;
+    margin-top:8px;
+    padding:10px 10px 10px 13px;
+    gap:10px;
+    border-radius:16px;
+  }
+  .brief-copy{gap:3px;}
+  .brief-kicker{
+    font-size:8px;
+    letter-spacing:1.08px;
+  }
+  .brief-title{
+    font-size:16.5px;
+    line-height:1.12;
+  }
+  .brief-subtitle{
+    font-size:11px;
+    line-height:1.25;
+  }
+  .brief-calendar-button{
+    width:37px;
+    height:37px;
+    flex-basis:37px;
+    border-radius:11px;
+  }
+  .brief-calendar-button svg{
+    width:17px;
+    height:17px;
+  }
+
+  /* Tres pestañas simétricas, sin carrusel horizontal innecesario. */
+  .tabs-row{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:5px;
+    padding-left:7px;
+    padding-right:7px;
+  }
+  .tab{
+    width:100%;
+    min-width:0;
+    padding-left:5px;
+    padding-right:5px;
+  }
+
+  /* Seis filas fijas con una escala equilibrada para el teléfono. */
+  .cal-grid{
+    grid-template-rows:repeat(6,42px);
+  }
+  .cal-cell{
+    height:42px;
+    min-height:42px;
+  }
+
+  /* El estado compacto mantiene un conmutador visible y profesional. */
+  body.header-collapsed .theme-toggle{
+    width:55px;
+    height:31px;
+    border-radius:11px;
+  }
+  body.header-collapsed .theme-toggle::before{
+    width:23px;
+    height:23px;
+    top:3px;
+    left:3px;
+    border-radius:8px;
+  }
+  html[data-theme="dark"] body.header-collapsed .theme-toggle::before{
+    transform:translateX(25px);
+  }
+}
+
+/* Ajuste responsable para teléfonos de menor altura. */
+@media (max-width:759px) and (max-height:720px){
+  .executive-brief{
+    min-height:58px;
+    max-height:76px;
+    padding-top:8px;
+    padding-bottom:8px;
+  }
+  .brief-title{font-size:15.5px;}
+  .brief-subtitle{font-size:10px;}
+  .cal-grid{grid-template-rows:repeat(6,39px);}
+  .cal-cell{
+    height:39px;
+    min-height:39px;
+  }
+}
