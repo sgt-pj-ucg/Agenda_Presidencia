@@ -1,0 +1,834 @@
+
+// Agenda Presidencia 5.0 · conserva el backend operativo de la versión estable
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
+
+let allEvents = [];
+let currentTab = 'hoy';
+let currentView = 'agenda';
+let calendarDate = new Date();
+let selectedCalDate = null;
+let activeDropdown = null;
+let editingEvent = null;
+let pendingDeleteEvent = null;
+let refreshTimer = null;
+
+const CATEGORIES = [
+  { id:'reuniones', label:'Reuniones', icon:'🤝', keywords:['reunión','reunion','reuniones'] },
+  { id:'visitas', label:'Visitas', icon:'👋', keywords:['visita','visitas'] },
+  { id:'audiencias', label:'Audiencias', icon:'⚖️', keywords:['audiencia','audiencias'] },
+  { id:'pleno', label:'Pleno', icon:'🏛', keywords:['pleno'] },
+  { id:'seminarios', label:'Cursos', icon:'🎓', keywords:['seminario','seminarios','capacitación','capacitacion','curso','cursos','diplomado'] },
+];
+
+const FIXED_TABS = [
+  { id:'hoy', label:'Hoy', icon:'📅' },
+  { id:'manana', label:'Mañana', icon:'⏭' },
+  { id:'semana', label:'Semana', icon:'📆' },
+];
+
+const SPECIAL_KEYWORDS = [
+  'permiso','permisos','vacación','vacacion','vacaciones','feriado legal',
+  'curso','cursos','capacitación','capacitacion','diplomado','academia judicial'
+];
+
+const STATUS_OPTIONS = [
+  {s:'Confirmada', color:'#70f0a3', dot:'#00e676', icon:'✓'},
+  {s:'Por Confirmar', color:'#d6a8ff', dot:'#b978f0', icon:'?'},
+  {s:'Pendiente', color:'#ffc45a', dot:'#ffb300', icon:'⏳'},
+  {s:'Ausente', color:'#a9bad8', dot:'#8398bd', icon:'⊘'},
+  {s:'Cancelada', color:'#ff8994', dot:'#ff4757', icon:'✕'},
+];
+
+function escapeHTML(value='') {
+  return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+}
+
+function parseCSV(text) {
+  const rows=[];
+  let row=[], cell='', quoted=false;
+  const source=String(text||'').replace(/^\uFEFF/, '');
+  for (let i=0;i<source.length;i++) {
+    const char=source[i];
+    if (char==='"') {
+      if (quoted && source[i+1]==='"') { cell+='"'; i++; }
+      else quoted=!quoted;
+    } else if (char===',' && !quoted) {
+      row.push(cell.trim()); cell='';
+    } else if ((char==='\n' || char==='\r') && !quoted) {
+      if (char==='\r' && source[i+1]==='\n') i++;
+      row.push(cell.trim());
+      rows.push(row);
+      row=[]; cell='';
+    } else cell+=char;
+  }
+  if (cell!=='' || row.length) { row.push(cell.trim()); rows.push(row); }
+  while (rows.length && rows[rows.length-1].every(value=>value==='')) rows.pop();
+  if (!rows.length) return [];
+  const headers=rows[0].map(h=>h.trim().toUpperCase());
+  return rows.slice(1).map((cols,idx)=>{
+    const obj={_row:idx+2};
+    headers.forEach((header,i)=>obj[header]=(cols[i]||'').trim());
+    obj.MODALIDAD=normalizeModality(obj.MODALIDAD);
+    obj.ESTADO=normalizeStatus(obj.ESTADO);
+    return obj;
+  }).filter(e=>e.FECHA&&e.ACTIVIDAD);
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  const [d,m,y]=String(str).split('/').map(Number);
+  if (!d||!m||!y) return null;
+  const date=new Date(y,m-1,d);
+  return Number.isNaN(date.getTime())?null:date;
+}
+
+function dateToInput(str) {
+  const date=parseDate(str);
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function inputToDate(value) {
+  const [y,m,d]=String(value).split('-');
+  return y&&m&&d?`${d}/${m}/${y}`:'';
+}
+
+function dayNameFromInput(value) {
+  const [y,m,d]=String(value).split('-').map(Number);
+  const name=new Date(y,m-1,d).toLocaleDateString('es-CL',{weekday:'long'});
+  return name.charAt(0).toUpperCase()+name.slice(1);
+}
+
+function sameDay(a,b) {
+  return a&&b&&a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+}
+
+function normalizeModality(value) {
+  const raw=String(value||'').trim();
+  const lower=raw.toLowerCase();
+  if (lower.includes('zoom') || lower.includes('telem') || lower.includes('virtual')) return 'Telemática';
+  if (lower.includes('híbr') || lower.includes('hibr')) return 'Híbrida';
+  if (lower.includes('presencial')) return 'Presencial';
+  return raw || 'Otro';
+}
+
+function normalizeStatus(value) {
+  const raw=String(value||'').trim();
+  const lower=raw.toLowerCase();
+  if (lower==='por confirmar' || lower==='por confirmar.') return 'Por Confirmar';
+  if (lower==='pendiente') return 'Pendiente';
+  if (lower==='ausente' || lower==='ausencia') return 'Ausente';
+  if (lower==='cancelada' || lower==='cancelado') return 'Cancelada';
+  return raw || 'Confirmada';
+}
+
+function eventKey(event) {
+  return `${event._row||''}|${event.FECHA||''}|${event.HORA||''}|${event.ACTIVIDAD||''}`;
+}
+
+function getStatus(event) { return normalizeStatus(event.ESTADO); }
+
+function isSpecialActivity(event) {
+  const text=[event.TIPO,event.CATEGORIA,event.ACTIVIDAD].filter(Boolean).join(' ').toLowerCase();
+  return SPECIAL_KEYWORDS.some(keyword=>text.includes(keyword));
+}
+
+function formatTime(value) {
+  if (!value) return '';
+  const match=String(value).match(/(\d{1,2}):(\d{2})/);
+  if (!match) return String(value);
+  return `${match[1].padStart(2,'0')}:${match[2]}`;
+}
+
+function timeToMin(value) {
+  if (!value) return -1;
+  const match=String(value).match(/(\d{1,2}):(\d{2})/);
+  return match?(Number(match[1])*60+Number(match[2])):-1;
+}
+
+function modalityMeta(value) {
+  const modality=normalizeModality(value);
+  if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:'📍',label:'ACTIVIDAD PRESENCIAL'};
+  if (modality==='Telemática') return {className:'telematica',badge:'b-telematica',icon:'💻',label:'ACTIVIDAD TELEMÁTICA'};
+  if (modality==='Híbrida') return {className:'hibrida',badge:'b-hibrida',icon:'🔀',label:'ACTIVIDAD HÍBRIDA'};
+  return {className:'otro',badge:'b-otro',icon:'📌',label:'OTRA MODALIDAD'};
+}
+
+function statusEmoji(status) {
+  return status==='Confirmada'?'✓':status==='Por Confirmar'?'?':status==='Pendiente'?'⏳':status==='Ausente'?'⊘':'✕';
+}
+
+function statusPillClass(status) {
+  if (status==='Por Confirmar') return 's-por-confirmar';
+  if (status==='Pendiente') return 's-pendiente';
+  if (status==='Ausente') return 's-ausente';
+  if (status==='Cancelada') return 's-cancelada';
+  return 's-confirmada';
+}
+
+function filterEvents(tab) {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const tomorrow=new Date(today); tomorrow.setDate(today.getDate()+1);
+  let events=[...allEvents];
+  if (tab==='hoy') events=events.filter(e=>sameDay(parseDate(e.FECHA),today));
+  else if (tab==='manana') events=events.filter(e=>sameDay(parseDate(e.FECHA),tomorrow));
+  else if (tab==='semana') {
+    const dow=today.getDay();
+    const monday=new Date(today); monday.setDate(today.getDate()+(dow===0?-6:1-dow));
+    const sunday=new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59,999);
+    events=events.filter(e=>{const date=parseDate(e.FECHA);return date&&date>=today&&date<=sunday;});
+  } else if (tab==='mes') {
+    events=events.filter(e=>{const date=parseDate(e.FECHA);return date&&date>=today&&date.getMonth()===today.getMonth()&&date.getFullYear()===today.getFullYear();});
+  } else {
+    const category=CATEGORIES.find(c=>c.id===tab);
+    if (category) events=events.filter(e=>{const date=parseDate(e.FECHA);return date&&date>=today&&category.keywords.some(k=>(e.ACTIVIDAD||'').toLowerCase().includes(k));});
+  }
+  return events;
+}
+
+function getActiveCats() {
+  return CATEGORIES.filter(category=>allEvents.some(event=>category.keywords.some(k=>(event.ACTIVIDAD||'').toLowerCase().includes(k))));
+}
+
+function buildTabs() {
+  const tabs=[...FIXED_TABS,...getActiveCats().map(c=>({id:c.id,label:c.label,icon:c.icon}))];
+  const row=document.getElementById('tabsRow');
+  row.innerHTML=tabs.map(tab=>{
+    const count=filterEvents(tab.id).length;
+    return `<button class="tab ${tab.id===currentTab?'active':''}" data-tab="${tab.id}" type="button">${tab.icon} ${tab.label} <span class="tab-count">${count}</span></button>`;
+  }).join('');
+  row.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{
+    currentTab=tab.dataset.tab; setView('agenda'); buildTabs(); render();
+  }));
+}
+
+function updateHeaderStats() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayEvents=allEvents.filter(event=>sameDay(parseDate(event.FECHA),today));
+  const confirmed=todayEvents.filter(event=>getStatus(event)==='Confirmada').length;
+  const toConfirm=todayEvents.filter(event=>getStatus(event)==='Por Confirmar').length;
+  const pending=todayEvents.filter(event=>getStatus(event)==='Pendiente').length;
+  const absent=todayEvents.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event)).length;
+  document.getElementById('headerStats').innerHTML=`
+    <div class="stat-chip primary"><span class="dot" style="background:#31c48d"></span>${todayEvents.length} hoy</div>
+    ${confirmed?`<div class="stat-chip"><span class="dot" style="background:#31c48d"></span>${confirmed} confirmada${confirmed===1?'':'s'}</div>`:''}
+    ${toConfirm?`<div class="stat-chip"><span class="dot" style="background:#7c83fd"></span>${toConfirm} por confirmar</div>`:''}
+    ${pending?`<div class="stat-chip"><span class="dot" style="background:#e6a23c"></span>${pending} pendiente${pending===1?'':'s'}</div>`:''}
+    ${absent?`<div class="stat-chip"><span class="dot" style="background:#7186a8"></span>${absent} ausencia${absent===1?'':'s'}</div>`:''}`;
+  updateExecutiveBrief(today,todayEvents);
+}
+
+function updateExecutiveBrief(today,todayEvents) {
+  const hour=new Date().getHours();
+  const greeting=hour<12?'Buenos días':hour<20?'Buenas tardes':'Buenas noches';
+  const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada');
+  const timed=active.filter(event=>event.HORA).slice().sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+  const absences=active.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event));
+  document.getElementById('briefKicker').textContent=today.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('briefTitle').textContent=`${greeting}, Presidenta.`;
+  let subtitle='No hay actividades registradas para hoy.';
+  if(active.length){
+    const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
+    const range=timed.length?` Primera a las ${formatTime(timed[0].HORA)}${timed.length>1?` y última a las ${formatTime(timed[timed.length-1].HORA)}`:''}.`:'.';
+    subtitle=`Hoy tiene ${count}.${range}`;
+  }
+  if(absences.length && active.length===absences.length) subtitle='La jornada está registrada como ausencia, permiso, curso o feriado legal.';
+  document.getElementById('briefSubtitle').textContent=subtitle;
+}
+
+function renderCard(event) {
+  const status=getStatus(event);
+  const modality=modalityMeta(event.MODALIDAD);
+  const special=isSpecialActivity(event);
+  const key=escapeHTML(eventKey(event));
+  const banner=special
+    ? `<div class="mode-banner mode-special">AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</div>`
+    : `<div class="mode-banner mode-${modality.className}"><span class="mode-icon">${modality.icon}</span> ${modality.label}</div>`;
+  return `
+    <article class="event-card ${modality.className} ${special?'special':''} ${status==='Cancelada'?'cancelada':''}" data-key="${key}" data-row="${event._row||''}">
+      ${banner}
+      <div class="card-top">
+        <div class="time-bubble ${event.HORA?'':'no-time'}"><div class="t-hour">${event.HORA?escapeHTML(formatTime(event.HORA)):'S/H'}</div></div>
+        <div class="card-body">
+          <div class="card-title">${escapeHTML(event.ACTIVIDAD)}</div>
+          <div class="card-badges">
+            <span class="badge ${modality.badge}">${modality.icon} ${escapeHTML(normalizeModality(event.MODALIDAD))}</span>
+            ${event.LUGAR?`<span class="badge b-lugar">🏛 ${escapeHTML(event.LUGAR)}</span>`:''}
+            ${event.PARTICIPANTES?`<span class="badge b-personas">👥 ${escapeHTML(event.PARTICIPANTES)}</span>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="status-row">
+        <button class="status-pill ${statusPillClass(status)}" data-key="${key}" type="button" aria-label="Cambiar estado de ${escapeHTML(event.ACTIVIDAD)}">
+          ${statusEmoji(status)} ${escapeHTML(status)} <span class="chevron">▾</span>
+        </button>
+        <div class="event-actions">
+          <button class="card-action edit" data-key="${key}" type="button" title="Editar actividad" aria-label="Editar ${escapeHTML(event.ACTIVIDAD)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="card-action delete" data-key="${key}" type="button" title="Eliminar actividad" aria-label="Eliminar ${escapeHTML(event.ACTIVIDAD)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+          </button>
+        </div>
+      </div>
+    </article>`;
+}
+
+function renderGroups(events) {
+  if (!events.length) return `<div class="empty"><div class="icon">📭</div><p>No hay actividades<br>para este período</p></div>`;
+  const grouped={};
+  events.forEach(event=>{ if(!grouped[event.FECHA]) grouped[event.FECHA]=[]; grouped[event.FECHA].push(event); });
+  return Object.keys(grouped).sort((a,b)=>parseDate(a)-parseDate(b)).map(key=>{
+    const date=parseDate(key);
+    const sorted=grouped[key].sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+    const dayName=date?date.toLocaleDateString('es-CL',{weekday:'long'}):'';
+    const dayNum=date?date.getDate():'';
+    const month=date?date.toLocaleDateString('es-CL',{month:'short'}):'';
+    return `<section class="date-group">
+      <div class="date-header">
+        <div class="date-circle"><div class="day-num">${dayNum}</div><div class="day-mon">${month}</div></div>
+        <div class="date-info"><div class="day-name">${dayName}</div><div class="day-count">${sorted.length} ${sorted.length===1?'actividad':'actividades'}</div></div>
+        <div class="date-divider"></div>
+      </div>
+      ${sorted.map(renderCard).join('')}
+    </section>`;
+  }).join('');
+}
+
+function formatDateKey(date){
+  return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`;
+}
+
+function dayStatusSegments(dayEvents){
+  const segments=[];
+  const add=(name,label)=>{if(!segments.some(item=>item.name===name))segments.push({name,label});};
+  if(dayEvents.some(event=>getStatus(event)==='Ausente'||isSpecialActivity(event))) add('absence','Ausencia');
+  if(dayEvents.some(event=>getStatus(event)==='Por Confirmar')) add('confirm','Por confirmar');
+  if(dayEvents.some(event=>getStatus(event)==='Pendiente')) add('pending','Pendiente');
+  if(dayEvents.some(event=>getStatus(event)==='Confirmada')) add('confirmed','Confirmada');
+  if(dayEvents.some(event=>getStatus(event)==='Cancelada')) add('cancelled','Cancelada');
+  return segments.slice(0,4);
+}
+
+function selectedDayEvents(){
+  if(!selectedCalDate) return [];
+  const key=formatDateKey(selectedCalDate);
+  return allEvents.filter(event=>event.FECHA===key).slice().sort((a,b)=>timeToMin(a.HORA)-timeToMin(b.HORA));
+}
+
+function moveSelectedDay(delta){
+  const base=selectedCalDate?new Date(selectedCalDate):new Date();
+  base.setDate(base.getDate()+delta);
+  base.setHours(0,0,0,0);
+  selectedCalDate=base;
+  calendarDate=new Date(base.getFullYear(),base.getMonth(),1);
+  render();
+}
+
+function renderSelectedDayPanel(){
+  const selected=selectedCalDate||new Date();
+  const events=selectedDayEvents();
+  const label=selected.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  const isToday=sameDay(selected,new Date());
+  const summary=events.length
+    ? `${events.length} ${events.length===1?'actividad registrada':'actividades registradas'}`
+    : 'Sin actividades registradas';
+  const activeEvents=events.filter(event=>getStatus(event)!=='Cancelada');
+  const first=activeEvents.find(event=>event.HORA);
+  return `<aside class="day-panel" id="dayPanel" aria-label="Detalle del día seleccionado">
+    <div class="day-panel-handle" aria-hidden="true"></div>
+    <div class="day-panel-head">
+      <button class="day-step" id="dayPrev" type="button" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 18-6-6 6-6"/></svg></button>
+      <div class="day-panel-copy">
+        <span class="day-panel-eyebrow">${isToday?'Hoy':'Día seleccionado'}</span>
+        <h3>${label.charAt(0).toUpperCase()+label.slice(1)}</h3>
+        <p>${summary}${first?` · Primera a las ${formatTime(first.HORA)}`:''}</p>
+      </div>
+      <button class="day-step" id="dayNext" type="button" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+    <div class="day-panel-events">
+      ${events.length?events.map(renderCard).join(''):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
+    </div>
+    <div class="swipe-hint">Deslice horizontalmente para cambiar de día</div>
+  </aside>`;
+}
+
+function renderCalendar() {
+  const year=calendarDate.getFullYear(), month=calendarDate.getMonth();
+  const today=new Date(); today.setHours(0,0,0,0);
+  if(!selectedCalDate){
+    selectedCalDate=(today.getMonth()===month&&today.getFullYear()===year)?new Date(today):new Date(year,month,1);
+  }
+  const monthName=calendarDate.toLocaleDateString('es-CL',{month:'long',year:'numeric'});
+  const firstDay=new Date(year,month,1);
+  let startDow=firstDay.getDay(); if(startDow===0) startDow=7;
+  const lastDay=new Date(year,month+1,0);
+  const monthEvents=allEvents.filter(event=>{
+    const date=parseDate(event.FECHA);
+    return date&&date.getMonth()===month&&date.getFullYear()===year;
+  });
+  const eventsByDate=new Map();
+  allEvents.forEach(event=>{
+    if(!eventsByDate.has(event.FECHA)) eventsByDate.set(event.FECHA,[]);
+    eventsByDate.get(event.FECHA).push(event);
+  });
+  const cells=[];
+  for(let i=1;i<startDow;i++) cells.push({date:new Date(year,month,1-(startDow-i)),current:false});
+  for(let day=1;day<=lastDay.getDate();day++) cells.push({date:new Date(year,month,day),current:true});
+  while(cells.length%7!==0){
+    const last=cells[cells.length-1].date;
+    cells.push({date:new Date(last.getFullYear(),last.getMonth(),last.getDate()+1),current:false});
+  }
+  const cellsHTML=cells.map(cell=>{
+    const key=formatDateKey(cell.date);
+    const dayEvents=eventsByDate.get(key)||[];
+    const segments=dayStatusSegments(dayEvents);
+    const isToday=sameDay(cell.date,today);
+    const isSelected=selectedCalDate&&sameDay(cell.date,selectedCalDate);
+    const line=segments.length?`<span class="activity-line" aria-hidden="true">${segments.map(segment=>`<i class="${segment.name}"></i>`).join('')}</span>`:'';
+    const labels=segments.map(segment=>segment.label).join(', ');
+    return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${segments.some(segment=>segment.name==='absence')?'has-absence':''}" data-date="${key}" type="button" aria-label="${key}${dayEvents.length?`, ${dayEvents.length} actividades, ${labels}`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${line}</button>`;
+  }).join('');
+  const selectedPanel=renderSelectedDayPanel();
+  return `<section class="calendar-workspace">
+    <div class="calendar-card">
+      <div class="cal-header">
+        <div class="cal-heading">
+          <span class="cal-eyebrow">Agenda mensual</span>
+          <h2 class="cal-title">${monthName.charAt(0).toUpperCase()+monthName.slice(1)}</h2>
+          <span class="cal-subtitle">${monthEvents.length} ${monthEvents.length===1?'actividad':'actividades'} este mes</span>
+        </div>
+        <div class="cal-controls">
+          <button class="cal-today-btn" id="calToday" type="button">Hoy</button>
+          <div class="cal-nav-group">
+            <button class="cal-nav" id="calPrev" type="button" aria-label="Mes anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button class="cal-nav" id="calNext" type="button" aria-label="Mes siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="cal-days-header">${['Lu','Ma','Mi','Ju','Vi','Sa','Do'].map(day=>`<span>${day}</span>`).join('')}</div>
+      <div class="cal-grid" id="calGrid">${cellsHTML}</div>
+      <div class="calendar-legend">
+        <span><i class="legend-ring"></i>Hoy</span>
+        <span><i class="legend-selected"></i>Seleccionado</span>
+        <span><i class="legend-line confirmed"></i>Confirmada</span>
+        <span><i class="legend-line confirm"></i>Por confirmar</span>
+        <span><i class="legend-line absence"></i>Ausencia</span>
+      </div>
+    </div>
+    ${selectedPanel}
+  </section>`;
+}
+
+function bindCalendarInteractions(){
+  document.getElementById('calPrev')?.addEventListener('click',()=>{
+    calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1);
+    selectedCalDate=new Date(calendarDate);
+    render();
+  });
+  document.getElementById('calNext')?.addEventListener('click',()=>{
+    calendarDate=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1);
+    selectedCalDate=new Date(calendarDate);
+    render();
+  });
+  document.getElementById('calToday')?.addEventListener('click',()=>{
+    const today=new Date(); today.setHours(0,0,0,0);
+    selectedCalDate=today;
+    calendarDate=new Date(today.getFullYear(),today.getMonth(),1);
+    render();
+  });
+  document.getElementById('calGrid')?.addEventListener('click',event=>{
+    const cell=event.target.closest('.cal-cell'); if(!cell?.dataset.date) return;
+    const [d,m,y]=cell.dataset.date.split('/').map(Number);
+    selectedCalDate=new Date(y,m-1,d);
+    calendarDate=new Date(y,m-1,1);
+    render();
+  });
+  document.getElementById('dayPrev')?.addEventListener('click',()=>moveSelectedDay(-1));
+  document.getElementById('dayNext')?.addEventListener('click',()=>moveSelectedDay(1));
+  document.getElementById('emptyAddButton')?.addEventListener('click',()=>{
+    openActivityModal('add');
+    if(selectedCalDate) document.getElementById('fFecha').value=dateToInput(formatDateKey(selectedCalDate));
+  });
+  const panel=document.getElementById('dayPanel');
+  if(panel){
+    let startX=0,startY=0;
+    panel.addEventListener('touchstart',event=>{
+      startX=event.changedTouches[0]?.clientX||0;
+      startY=event.changedTouches[0]?.clientY||0;
+    },{passive:true});
+    panel.addEventListener('touchend',event=>{
+      const endX=event.changedTouches[0]?.clientX||0;
+      const endY=event.changedTouches[0]?.clientY||0;
+      const dx=endX-startX,dy=endY-startY;
+      if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.25) moveSelectedDay(dx<0?1:-1);
+    },{passive:true});
+  }
+}
+
+function render() {
+  const content=document.getElementById('content');
+  const timestamp=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  let html=`<div class="updated-bar"><span class="live-dot"></span>Sincronizado a las ${timestamp}</div>`;
+  if(currentView==='calendario') html+=renderCalendar();
+  else if(currentView==='mes') html+=renderGroups(filterEvents('mes'));
+  else html+=renderGroups(filterEvents(currentTab));
+  content.innerHTML=html;
+  bindCardActions();
+  if(currentView==='calendario') bindCalendarInteractions();
+}
+
+function findEventByKey(key) { return allEvents.find(event=>eventKey(event)===key); }
+
+function closeDropdown() {
+  if (activeDropdown) { activeDropdown.remove(); activeDropdown=null; }
+}
+
+document.addEventListener('click',closeDropdown);
+
+function openStatusDropdown(pill,event) {
+  closeDropdown();
+  const current=getStatus(event);
+  const dropdown=document.createElement('div');
+  dropdown.className='status-dropdown';
+  dropdown.innerHTML=STATUS_OPTIONS.map(option=>`<button class="status-option" data-status="${option.s}" type="button" style="color:${option.color}"><span class="opt-dot" style="background:${option.dot}"></span>${option.icon} ${option.s}${current===option.s?' ✔':''}</button>`).join('');
+  document.body.appendChild(dropdown);
+  const rect=pill.getBoundingClientRect();
+  const height=STATUS_OPTIONS.length*44;
+  dropdown.style.top=(rect.bottom+4+height>window.innerHeight?Math.max(8,rect.top-height-4):rect.bottom+4)+'px';
+  dropdown.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-205))+'px';
+  activeDropdown=dropdown;
+  dropdown.querySelectorAll('.status-option').forEach(option=>option.addEventListener('click',async click=>{
+    click.stopPropagation();
+    const newStatus=option.dataset.status;
+    closeDropdown();
+    showToast('Guardando estado…');
+    try {
+      await sendScriptAction('estado',{fila:event._row,fecha:event.FECHA,hora:event.HORA,actividad:event.ACTIVIDAD,estado:newStatus});
+      event.ESTADO=newStatus;
+      updateHeaderStats(); buildTabs(); render();
+      showToast(`✓ Estado actualizado: ${newStatus}`);
+      scheduleRefresh();
+    } catch (error) {
+      showToast(`⚠️ ${error.message||'No fue posible sincronizar el estado'}`);
+    }
+  }));
+}
+
+function bindCardActions() {
+  document.querySelectorAll('.status-pill').forEach(pill=>pill.addEventListener('click',event=>{
+    event.stopPropagation(); const item=findEventByKey(pill.dataset.key); if(item) openStatusDropdown(pill,item);
+  }));
+  document.querySelectorAll('.card-action.edit').forEach(button=>button.addEventListener('click',event=>{
+    event.stopPropagation(); const item=findEventByKey(button.dataset.key); if(item) openActivityModal('edit',item);
+  }));
+  document.querySelectorAll('.card-action.delete').forEach(button=>button.addEventListener('click',event=>{
+    event.stopPropagation(); const item=findEventByKey(button.dataset.key); if(item) openDeleteModal(item);
+  }));
+}
+
+function setView(view) {
+  currentView=view;
+  document.querySelectorAll('.nav-btn:not(.nav-add)').forEach(button=>button.classList.remove('active'));
+  const map={agenda:'navAgenda',calendario:'navCalendar',buscar:'navSearch',mes:'navMes'};
+  document.getElementById(map[view])?.classList.add('active');
+  const searchInfo=document.getElementById('searchInfo');
+  const searchBar=document.querySelector('.search-bar');
+  if (view==='buscar') { searchBar.style.display='flex'; setTimeout(()=>searchInput.focus(),50); }
+  else searchBar.style.display='';
+  searchInfo.style.display='none';
+  searchInput.value='';
+}
+
+document.getElementById('navAgenda').addEventListener('click',()=>{currentTab='hoy';setView('agenda');buildTabs();render();});
+document.getElementById('navCalendar').addEventListener('click',()=>{setView('calendario');render();});
+document.getElementById('navMes').addEventListener('click',()=>{setView('mes');render();});
+document.getElementById('navSearch').addEventListener('click',()=>setView('buscar'));
+document.getElementById('briefCalendarButton')?.addEventListener('click',()=>{setView('calendario');render();});
+
+const activityModal=document.getElementById('activityModal');
+const deleteModal=document.getElementById('deleteModal');
+
+function resetActivityForm() {
+  ['fHora','fActividad','fLugar','fParticipantes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fModalidad').value='Presencial';
+  document.getElementById('fEstado').value='Confirmada';
+  document.getElementById('formMsg').textContent='';
+}
+
+function openActivityModal(mode,event=null) {
+  editingEvent=mode==='edit'?event:null;
+  resetActivityForm();
+  const title=document.getElementById('activityModalTitle');
+  const subtitle=document.getElementById('activityModalSubtitle');
+  const save=document.getElementById('btnGuardar');
+  if (editingEvent) {
+    title.textContent='✏️ Editar actividad';
+    subtitle.textContent='Modifica la fecha, actividad, modalidad, estado y demás antecedentes.';
+    save.textContent='Guardar cambios';
+    document.getElementById('fFecha').value=dateToInput(editingEvent.FECHA);
+    document.getElementById('fHora').value=formatTime(editingEvent.HORA);
+    document.getElementById('fActividad').value=editingEvent.ACTIVIDAD||'';
+    document.getElementById('fModalidad').value=normalizeModality(editingEvent.MODALIDAD);
+    document.getElementById('fEstado').value=getStatus(editingEvent);
+    document.getElementById('fLugar').value=editingEvent.LUGAR||'';
+    document.getElementById('fParticipantes').value=editingEvent.PARTICIPANTES||'';
+  } else {
+    title.textContent='➕ Nueva actividad'; subtitle.textContent='Registra la actividad y sus antecedentes principales.'; save.textContent='Guardar actividad';
+    document.getElementById('fFecha').value=new Date().toISOString().split('T')[0];
+  }
+  activityModal.classList.add('open');
+  setTimeout(()=>document.getElementById('fActividad').focus(),280);
+}
+
+function closeActivityModal() { activityModal.classList.remove('open'); editingEvent=null; }
+
+document.getElementById('navAdd').addEventListener('click',()=>openActivityModal('add'));
+document.getElementById('btnCancelarModal').addEventListener('click',closeActivityModal);
+document.getElementById('btnCloseActivityModal').addEventListener('click',closeActivityModal);
+activityModal.addEventListener('click',event=>{if(event.target===activityModal)closeActivityModal();});
+
+function getFormEvent() {
+  const inputDate=document.getElementById('fFecha').value;
+  return {
+    FECHA:inputToDate(inputDate),
+    'DÍA':dayNameFromInput(inputDate),
+    HORA:document.getElementById('fHora').value,
+    MODALIDAD:normalizeModality(document.getElementById('fModalidad').value),
+    ACTIVIDAD:document.getElementById('fActividad').value.trim(),
+    LUGAR:document.getElementById('fLugar').value.trim(),
+    PARTICIPANTES:document.getElementById('fParticipantes').value.trim(),
+    ESTADO:normalizeStatus(document.getElementById('fEstado').value),
+  };
+}
+
+document.getElementById('btnGuardar').addEventListener('click',async()=>{
+  const data=getFormEvent();
+  const message=document.getElementById('formMsg');
+  const button=document.getElementById('btnGuardar');
+  if (!data.FECHA||!data.ACTIVIDAD) { message.textContent='⚠️ Completa la fecha y la actividad.'; return; }
+  button.disabled=true; button.textContent=editingEvent?'Guardando cambios…':'Guardando…'; message.textContent='';
+  try {
+    if (editingEvent) {
+      const original={...editingEvent};
+      await sendScriptAction('editar',{
+        fila:original._row,fechaOriginal:original.FECHA,horaOriginal:original.HORA,actividadOriginal:original.ACTIVIDAD,
+        fecha:data.FECHA,dia:data['DÍA'],hora:data.HORA,modalidad:data.MODALIDAD,actividad:data.ACTIVIDAD,
+        lugar:data.LUGAR,participantes:data.PARTICIPANTES,estado:data.ESTADO
+      });
+      Object.assign(editingEvent,data);
+      showToast('✓ Actividad actualizada');
+    } else {
+      const result=await sendScriptAction('nueva',{
+        fecha:data.FECHA,dia:data['DÍA'],hora:data.HORA,modalidad:data.MODALIDAD,actividad:data.ACTIVIDAD,
+        lugar:data.LUGAR,participantes:data.PARTICIPANTES,estado:data.ESTADO
+      });
+      const tempRow=Math.max(1,...allEvents.map(e=>Number(e._row)||1))+1;
+      allEvents.push({...data,_row:Number(result.row)||tempRow});
+      showToast('✓ Actividad creada');
+    }
+    closeActivityModal(); updateHeaderStats(); buildTabs(); render(); scheduleRefresh();
+  } catch (error) {
+    message.textContent=`⚠️ ${error.message||'No fue posible sincronizar con la planilla.'}`;
+  } finally {
+    button.disabled=false; button.textContent=editingEvent?'Guardar cambios':'Guardar actividad';
+  }
+});
+
+function openDeleteModal(event) {
+  pendingDeleteEvent=event;
+  document.getElementById('deleteActivityName').textContent=`“${event.ACTIVIDAD}”`;
+  document.getElementById('deleteMsg').textContent='';
+  deleteModal.classList.add('open');
+}
+
+function closeDeleteModal() { deleteModal.classList.remove('open'); pendingDeleteEvent=null; }
+
+document.getElementById('btnCloseDeleteModal').addEventListener('click',closeDeleteModal);
+document.getElementById('btnCancelDelete').addEventListener('click',closeDeleteModal);
+deleteModal.addEventListener('click',event=>{if(event.target===deleteModal)closeDeleteModal();});
+
+document.getElementById('btnConfirmDelete').addEventListener('click',async()=>{
+  if(!pendingDeleteEvent) return;
+  const item=pendingDeleteEvent;
+  const button=document.getElementById('btnConfirmDelete');
+  const message=document.getElementById('deleteMsg');
+  button.disabled=true; button.textContent='Eliminando…'; message.textContent='';
+  try {
+    await sendScriptAction('eliminar',{fila:item._row,fecha:item.FECHA,hora:item.HORA,actividad:item.ACTIVIDAD});
+    allEvents=allEvents.filter(event=>event!==item);
+    closeDeleteModal(); updateHeaderStats(); buildTabs(); render(); showToast('✓ Actividad eliminada'); scheduleRefresh();
+  } catch (error) { message.textContent=`⚠️ ${error.message||'No fue posible eliminar la actividad.'}`; }
+  finally { button.disabled=false; button.textContent='Sí, eliminar actividad'; }
+});
+
+function sendScriptAction(action,params={}) {
+  if (!SCRIPT_URL) return Promise.reject(new Error('SCRIPT_URL no configurada'));
+  return new Promise((resolve,reject)=>{
+    const callbackName=`__agenda_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+    const query=new URLSearchParams({
+      accion:action,
+      requestId:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      callback:callbackName
+    });
+    Object.entries(params).forEach(([key,value])=>query.set(key,value??''));
+
+    const script=document.createElement('script');
+    let finished=false;
+    const cleanup=()=>{
+      if(finished) return;
+      finished=true;
+      clearTimeout(timer);
+      script.remove();
+      try { delete window[callbackName]; } catch (_) { window[callbackName]=undefined; }
+    };
+    const fail=message=>{ cleanup(); reject(new Error(message)); };
+    const timer=setTimeout(()=>fail('La planilla no respondió. Revisa la conexión o la implementación de Apps Script.'),15000);
+
+    window[callbackName]=payload=>{
+      if(payload&&payload.ok){ cleanup(); resolve(payload); }
+      else fail(payload?.error||'Google Sheets rechazó la operación.');
+    };
+    script.onerror=()=>fail('No fue posible conectar con Google Apps Script.');
+    script.src=`${SCRIPT_URL}?${query.toString()}`;
+    document.body.appendChild(script);
+  });
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(()=>loadData({silent:true}),2200);
+}
+
+const MESES={enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11};
+const NUMEROS={uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciséis:16,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,'veintidós':22,veintidos:22,'veintitrés':23,veintitres:23,veinticuatro:24,veinticinco:25,'veintiséis':26,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,'treinta y uno':31};
+
+function parseSpanishQuery(query) {
+  const lower=query.toLowerCase().trim(); let targetDate=null;
+  for (const [word,number] of Object.entries(NUMEROS)) {
+    for (const [monthName,monthNumber] of Object.entries(MESES)) {
+      if (lower.includes(`${word} de ${monthName}`)||lower.includes(`${word} ${monthName}`)) { targetDate=new Date(new Date().getFullYear(),monthNumber,number); break; }
+    }
+    if (targetDate) break;
+  }
+  if (!targetDate) { const match=lower.match(/(\d{1,2})\s*(?:de\s+)?(\w+)/); if(match&&MESES[match[2]]!==undefined)targetDate=new Date(new Date().getFullYear(),MESES[match[2]],Number(match[1])); }
+  if (!targetDate) { const match=lower.match(/(\d{1,2})[\/-](\d{1,2})/); if(match)targetDate=new Date(new Date().getFullYear(),Number(match[2])-1,Number(match[1])); }
+  return {targetDate,rawQuery:lower};
+}
+
+function searchEvents(query) {
+  if (!query.trim()) return null;
+  const {targetDate,rawQuery}=parseSpanishQuery(query);
+  if (targetDate) return allEvents.filter(e=>sameDay(parseDate(e.FECHA),targetDate));
+  const getText=e=>[e.ACTIVIDAD,e.LUGAR,e.PARTICIPANTES,normalizeModality(e.MODALIDAD),getStatus(e)].join(' ').toLowerCase();
+  const words=rawQuery.split(' ').filter(word=>word.length>2);
+  let results=allEvents.filter(e=>getText(e).includes(rawQuery));
+  if (results.length) return results;
+  results=allEvents.filter(e=>{const text=getText(e);return words.length>0&&words.every(word=>text.includes(word));});
+  if (results.length) return results;
+  return allEvents.filter(e=>{const text=getText(e);return words.some(word=>text.includes(word));});
+}
+
+const searchInput=document.getElementById('searchInput');
+function handleSearch(query) {
+  document.getElementById('clearSearch').style.display=query?'block':'none';
+  const info=document.getElementById('searchInfo');
+  if (!query.trim()) { info.style.display='none'; render(); return; }
+  const results=searchEvents(query);
+  info.style.display='block';
+  info.textContent=results.length?`${results.length} resultado${results.length!==1?'s':''} para “${query}”`:`Sin resultados para “${query}”`;
+  document.getElementById('content').innerHTML=results.length?renderGroups(results):`<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
+  bindCardActions();
+}
+searchInput.addEventListener('input',event=>handleSearch(event.target.value));
+document.getElementById('clearSearch').addEventListener('click',()=>{searchInput.value='';handleSearch('');searchInput.focus();});
+
+const voiceBtn=document.getElementById('voiceBtn');
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+if (!SpeechRecognition) voiceBtn.style.opacity='.35';
+else {
+  const recognition=new SpeechRecognition(); recognition.lang='es-CL'; recognition.continuous=false; recognition.interimResults=false;
+  recognition.onstart=()=>voiceBtn.classList.add('listening');
+  recognition.onend=()=>voiceBtn.classList.remove('listening');
+  recognition.onerror=()=>{voiceBtn.classList.remove('listening');showToast('No se pudo escuchar');};
+  recognition.onresult=event=>{const text=event.results[0][0].transcript;searchInput.value=text;handleSearch(text);};
+  voiceBtn.addEventListener('click',()=>{if(voiceBtn.classList.contains('listening'))recognition.stop();else{recognition.start();showToast('🎙️ Escuchando…');}});
+}
+
+function showToast(message) {
+  const toast=document.getElementById('toast'); toast.textContent=message; toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),2800);
+}
+
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape') return;
+  closeDropdown();
+  if(activityModal.classList.contains('open')) closeActivityModal();
+  if(deleteModal.classList.contains('open')) closeDeleteModal();
+});
+
+
+
+const themeToggle = document.getElementById('themeToggle');
+const themeColorMeta = document.getElementById('themeColorMeta');
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+
+function syncThemeControls() {
+  const theme = currentTheme();
+  const nextThemeName = theme === 'dark' ? 'claro' : 'oscuro';
+  themeToggle.setAttribute('aria-label', `Cambiar a modo ${nextThemeName}`);
+  themeToggle.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
+  themeToggle.title = `Modo ${theme === 'dark' ? 'oscuro' : 'claro'} · Cambiar a ${nextThemeName}`;
+  if (themeColorMeta) themeColorMeta.content = theme === 'dark' ? '#101d49' : '#f4f7fb';
+}
+
+function setTheme(theme, persist = true) {
+  document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+  if (persist) {
+    try { localStorage.setItem('agenda-theme', currentTheme()); } catch (_) {}
+  }
+  syncThemeControls();
+}
+
+themeToggle.addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  showToast(next === 'light' ? '☀ Modo claro activado' : '☾ Modo oscuro activado');
+});
+
+syncThemeControls();
+
+document.getElementById('refreshBtn').addEventListener('click',()=>loadData());
+
+async function loadData({silent=false}={}) {
+  if(!silent) document.getElementById('content').innerHTML='<div class="loading"><div class="spinner"></div>Cargando agenda…</div>';
+  try {
+    const demoMode=new URLSearchParams(window.location.search).has('demo');
+    if(demoMode){
+      const today=new Date();
+      const key=offset=>formatDateKey(new Date(today.getFullYear(),today.getMonth(),today.getDate()+offset));
+      allEvents=[
+        {FECHA:key(0),'DÍA':'Hoy',HORA:'09:00',MODALIDAD:'Presencial',ACTIVIDAD:'Reunión de coordinación de Presidencia',LUGAR:'Sala de reuniones',PARTICIPANTES:'Equipo de Presidencia',ESTADO:'Confirmada',_row:2},
+        {FECHA:key(0),'DÍA':'Hoy',HORA:'12:30',MODALIDAD:'Híbrida',ACTIVIDAD:'Pleno extraordinario',LUGAR:'Salón de Pleno',PARTICIPANTES:'Ministras y ministros',ESTADO:'Por Confirmar',_row:3},
+        {FECHA:key(1),'DÍA':'Mañana',HORA:'10:00',MODALIDAD:'Telemática',ACTIVIDAD:'Audiencia protocolar',LUGAR:'Enlace institucional',PARTICIPANTES:'Autoridades regionales',ESTADO:'Pendiente',_row:4},
+        {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Feriado legal de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:5},
+        {FECHA:key(4),'DÍA':'',HORA:'15:30',MODALIDAD:'Presencial',ACTIVIDAD:'Ceremonia de juramento',LUGAR:'Tercera Sala',PARTICIPANTES:'Invitados',ESTADO:'Confirmada',_row:6}
+      ];
+      updateHeaderStats();buildTabs();render();return;
+    }
+    const response=await fetch(`${CSV_URL}&t=${Date.now()}`,{cache:'no-store'});
+    if(!response.ok) throw new Error('No fue posible cargar la planilla');
+    const text=await response.text();
+    allEvents=parseCSV(text);
+    updateHeaderStats();buildTabs();render();
+    if(silent) showToast('↻ Agenda sincronizada');
+  } catch(error) {
+    if(!silent) document.getElementById('content').innerHTML='<div class="empty"><div class="icon">⚠️</div><p>Error al cargar.<br>Verifica la conexión.</p></div>';
+  }
+}
+
+loadData();
