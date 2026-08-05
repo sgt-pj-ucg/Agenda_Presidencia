@@ -1,18 +1,24 @@
-# Agenda Presidenta — bienvenida premium con mayor duración
+# Agenda Presidenta — modalidades reforzadas en modo claro
 
-## Ajuste aplicado
+## Cambio visual
 
-La pantalla de inicio permanece visible aproximadamente **2,4 segundos** antes de desaparecer suavemente.
+El modo oscuro se conserva prácticamente igual. En modo claro, las actividades ahora se distinguen mediante tres señales coordinadas:
 
-- Permite leer “Agenda Presidenta Gloria Negroni”.
-- Mantiene visible la identificación de la Corte.
-- La agenda continúa cargando en segundo plano.
-- El tiempo máximo de respaldo es de 3,2 segundos.
-- En teléfonos con “reducir movimiento” permanece cerca de 0,9 segundos.
+- fondo suavemente teñido;
+- borde lateral fino;
+- banda superior e ícono con identidad propia.
+
+### Paleta
+
+- Presencial: verde salvia.
+- Telemática: azul acero.
+- Híbrida: violeta humo con azul petróleo.
+
+Los colores no son fluorescentes y no alteran la lectura de estados como Confirmada, Pendiente o Ausente.
 
 ## Actualización
 
-Sube nuevamente todo el contenido de esta carpeta al repositorio:
+Sube todo el contenido de esta carpeta al repositorio:
 
 - `index.html`
 - `styles.css`
@@ -21,8 +27,6 @@ Sube nuevamente todo el contenido de esta carpeta al repositorio:
 - `manifest.webmanifest`
 - carpeta `icons/`
 
-Después de publicar:
+No es necesario modificar `Code.gs`.
 
-1. Cierra completamente la aplicación.
-2. Vuelve a abrirla.
-3. Si aún aparece la versión anterior, elimina el acceso directo e instálala nuevamente desde Chrome.
+Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para renovar la caché.

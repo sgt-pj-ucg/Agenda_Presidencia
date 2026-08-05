@@ -3139,3 +3139,169 @@ html[data-theme="light"] .launch-progress{
   .launch-halo{opacity:.24;transform:none;}
   .launch-screen{transition-duration:.12s;}
 }
+
+/* ==========================================================================
+   Entrega 5.0.10 · modalidades más reconocibles en modo claro
+   La diferenciación usa color como acento, no como superficie fluorescente.
+   ========================================================================== */
+
+html[data-theme="light"]{
+  --light-presencial:#327963;
+  --light-presencial-deep:#245f4e;
+  --light-presencial-tint:#eaf5f0;
+  --light-presencial-line:#8ebdab;
+
+  --light-telematica:#3d6f9f;
+  --light-telematica-deep:#2b587f;
+  --light-telematica-tint:#edf3f9;
+  --light-telematica-line:#9eb9d3;
+
+  --light-hibrida-a:#6f6097;
+  --light-hibrida-b:#3e7f8c;
+  --light-hibrida-deep:#574978;
+  --light-hibrida-tint:#f1eff6;
+  --light-hibrida-line:#b6accd;
+}
+
+/* Tres señales simultáneas: fondo suave, borde fino y banda superior. */
+html[data-theme="light"] .event-card.presencial{
+  border-color:color-mix(in srgb,var(--light-presencial-line) 52%,#d7e0e9);
+  border-left:4px solid var(--light-presencial);
+  background:
+    linear-gradient(105deg,var(--light-presencial-tint) 0 24%,rgba(255,255,255,.93) 58%),
+    #fff;
+  box-shadow:
+    0 10px 28px rgba(47,75,68,.105),
+    inset 0 1px 0 rgba(255,255,255,.94);
+}
+html[data-theme="light"] .event-card.telematica{
+  border-color:color-mix(in srgb,var(--light-telematica-line) 52%,#d7e0e9);
+  border-left:4px solid var(--light-telematica);
+  background:
+    linear-gradient(105deg,var(--light-telematica-tint) 0 24%,rgba(255,255,255,.93) 58%),
+    #fff;
+  box-shadow:
+    0 10px 28px rgba(43,75,108,.105),
+    inset 0 1px 0 rgba(255,255,255,.94);
+}
+html[data-theme="light"] .event-card.hibrida{
+  border-color:color-mix(in srgb,var(--light-hibrida-line) 55%,#d7e0e9);
+  border-left-color:transparent;
+  background:
+    linear-gradient(105deg,var(--light-hibrida-tint) 0 26%,rgba(255,255,255,.93) 60%),
+    #fff;
+  box-shadow:
+    0 10px 28px rgba(75,65,103,.105),
+    inset 0 1px 0 rgba(255,255,255,.94);
+}
+html[data-theme="light"] .event-card.hibrida::after{
+  width:4px;
+  background:linear-gradient(180deg,var(--light-hibrida-a),var(--light-hibrida-b));
+}
+
+/* Bandas de modalidad con contraste sobrio y profesional. */
+html[data-theme="light"] .mode-banner{
+  min-height:36px;
+  padding:7px 12px!important;
+  letter-spacing:.09em!important;
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.54);
+}
+html[data-theme="light"] .mode-presencial{
+  color:var(--light-presencial-deep)!important;
+  background:linear-gradient(90deg,#dceee7,#edf7f3)!important;
+  border-bottom-color:var(--light-presencial-line)!important;
+}
+html[data-theme="light"] .mode-telematica{
+  color:var(--light-telematica-deep)!important;
+  background:linear-gradient(90deg,#e0ebf5,#f0f5fa)!important;
+  border-bottom-color:var(--light-telematica-line)!important;
+}
+html[data-theme="light"] .mode-hibrida{
+  color:var(--light-hibrida-deep)!important;
+  background:linear-gradient(90deg,#e8e4f1 0 58%,#e7f1f3 100%)!important;
+  border-bottom-color:var(--light-hibrida-line)!important;
+}
+
+/* El símbolo funciona como una pequeña firma cromática inmediata. */
+html[data-theme="light"] .mode-presencial .mode-icon{
+  color:#fff;
+  background:var(--light-presencial);
+  border-color:var(--light-presencial-deep);
+  box-shadow:0 3px 8px rgba(36,95,78,.18);
+}
+html[data-theme="light"] .mode-telematica .mode-icon{
+  color:#fff;
+  background:var(--light-telematica);
+  border-color:var(--light-telematica-deep);
+  box-shadow:0 3px 8px rgba(43,88,127,.18);
+}
+html[data-theme="light"] .mode-hibrida .mode-icon{
+  color:#fff;
+  background:linear-gradient(135deg,var(--light-hibrida-a),var(--light-hibrida-b));
+  border-color:var(--light-hibrida-deep);
+  box-shadow:0 3px 8px rgba(87,73,120,.18);
+}
+
+/* Hora y etiqueta repiten el lenguaje de modalidad sin cargar la tarjeta. */
+html[data-theme="light"] .event-card.presencial .time-bubble{
+  background:#f1f8f5;
+  border-color:var(--light-presencial-line);
+  box-shadow:0 4px 12px rgba(47,100,82,.08);
+}
+html[data-theme="light"] .event-card.presencial .time-bubble .t-hour{
+  color:var(--light-presencial-deep);
+}
+html[data-theme="light"] .event-card.telematica .time-bubble{
+  background:#f2f6fa;
+  border-color:var(--light-telematica-line);
+  box-shadow:0 4px 12px rgba(43,88,127,.08);
+}
+html[data-theme="light"] .event-card.telematica .time-bubble .t-hour{
+  color:var(--light-telematica-deep);
+}
+html[data-theme="light"] .event-card.hibrida .time-bubble{
+  background:linear-gradient(135deg,#f5f2f9,#f0f6f7);
+  border-color:var(--light-hibrida-line);
+  box-shadow:0 4px 12px rgba(87,73,120,.08);
+}
+html[data-theme="light"] .event-card.hibrida .time-bubble .t-hour{
+  color:var(--light-hibrida-deep);
+}
+
+html[data-theme="light"] .b-presencial{
+  color:var(--light-presencial-deep)!important;
+  background:#e2f1eb!important;
+  border-color:var(--light-presencial-line)!important;
+}
+html[data-theme="light"] .b-telematica{
+  color:var(--light-telematica-deep)!important;
+  background:#e5eef7!important;
+  border-color:var(--light-telematica-line)!important;
+}
+html[data-theme="light"] .b-hibrida{
+  color:var(--light-hibrida-deep)!important;
+  background:linear-gradient(135deg,#ebe7f3,#e7f1f2)!important;
+  border-color:var(--light-hibrida-line)!important;
+}
+
+/* La franja inferior permanece neutra: la modalidad no compite con el estado. */
+html[data-theme="light"] .event-card.presencial .status-row,
+html[data-theme="light"] .event-card.telematica .status-row,
+html[data-theme="light"] .event-card.hibrida .status-row{
+  background:rgba(248,250,252,.84);
+  border-top-color:rgba(48,70,98,.10);
+}
+
+@media (hover:hover){
+  html[data-theme="light"] .event-card.presencial:hover{
+    border-left-color:var(--light-presencial-deep);
+    box-shadow:0 13px 32px rgba(47,75,68,.14),inset 0 1px 0 #fff;
+  }
+  html[data-theme="light"] .event-card.telematica:hover{
+    border-left-color:var(--light-telematica-deep);
+    box-shadow:0 13px 32px rgba(43,75,108,.14),inset 0 1px 0 #fff;
+  }
+  html[data-theme="light"] .event-card.hibrida:hover{
+    box-shadow:0 13px 32px rgba(75,65,103,.14),inset 0 1px 0 #fff;
+  }
+}
