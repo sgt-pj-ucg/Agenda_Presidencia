@@ -2412,3 +2412,280 @@ html[data-theme="light"] .cal-cell.has-absence.selected{
     transition:none!important;
   }
 }
+
+/* ==========================================================================
+   Entrega 5.0.5 · estabilidad, hora amigable, dictado y limpieza visual
+   ========================================================================== */
+
+/* Evita que el navegador compense el scroll mientras cambia el encabezado. */
+.app-header,.executive-brief{overflow-anchor:none;}
+
+/* Menú de estados: textos completos y área táctil uniforme. */
+.status-dropdown{
+  min-width:0;
+  max-width:calc(100vw - 20px);
+  border-radius:18px;
+}
+.status-option{
+  min-height:48px;
+  padding:12px 15px;
+  white-space:nowrap;
+  overflow:visible;
+  line-height:1.2;
+}
+.opt-dot{flex:0 0 8px;}
+
+/* Campo de hora propio: no abre el selector nativo recortado del teléfono. */
+.time-field-button{
+  width:100%;
+  min-height:47px;
+  padding:0 13px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-radius:13px;
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface-2);
+  color:var(--v5-text);
+  cursor:pointer;
+  text-align:left;
+}
+.time-field-button svg{
+  width:19px;
+  height:19px;
+  flex:0 0 19px;
+  color:var(--v5-blue);
+}
+.time-field-value{
+  font-size:15px;
+  font-weight:750;
+  letter-spacing:.01em;
+}
+.time-shortcuts{
+  display:flex;
+  gap:5px;
+  margin-top:7px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  padding-bottom:1px;
+}
+.time-shortcuts::-webkit-scrollbar{display:none;}
+.time-shortcuts button{
+  flex:0 0 auto;
+  min-height:29px;
+  padding:0 9px;
+  border-radius:999px;
+  border:1px solid var(--v5-line);
+  background:transparent;
+  color:var(--v5-muted);
+  font-size:10px;
+  font-weight:750;
+  cursor:pointer;
+}
+.time-shortcuts button.active{
+  color:var(--v5-text);
+  border-color:color-mix(in srgb,var(--v5-brand) 55%,var(--v5-line));
+  background:var(--v5-brand-soft);
+}
+
+.time-picker-overlay{z-index:1150;}
+.time-picker-modal{
+  max-width:470px;
+  padding-bottom:max(22px,env(safe-area-inset-bottom));
+}
+.time-picker-display{
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr) 58px;
+  align-items:end;
+  gap:10px;
+  margin:8px 0 14px;
+}
+.time-adjust-button{
+  height:54px;
+  border-radius:15px;
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface-2);
+  color:var(--v5-blue);
+  font-size:14px;
+  font-weight:850;
+  cursor:pointer;
+}
+.time-number-fields{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr);
+  align-items:end;
+  gap:5px;
+}
+.time-number-fields strong{
+  padding-bottom:13px;
+  color:var(--v5-muted);
+  font-size:22px;
+}
+.time-number-fields label{
+  display:grid;
+  gap:5px;
+  color:var(--v5-muted);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-align:center;
+  text-transform:uppercase;
+}
+.time-number-fields input{
+  width:100%;
+  height:54px;
+  padding:0 4px;
+  border-radius:15px;
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface-2);
+  color:var(--v5-text);
+  font-size:24px;
+  font-weight:850;
+  text-align:center;
+  appearance:textfield;
+}
+.time-number-fields input::-webkit-inner-spin-button,
+.time-number-fields input::-webkit-outer-spin-button{appearance:none;margin:0;}
+.time-picker-presets{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+  margin-bottom:14px;
+}
+.time-picker-presets button{
+  min-height:38px;
+  border-radius:11px;
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface-2);
+  color:var(--v5-text);
+  font-size:11px;
+  font-weight:760;
+  cursor:pointer;
+}
+.time-picker-actions{
+  display:grid;
+  grid-template-columns:.9fr 1fr 1.25fr;
+  gap:7px;
+}
+.time-picker-actions button{
+  min-height:45px;
+  padding:0 8px;
+  border-radius:13px;
+  font-size:11px;
+  font-weight:820;
+  white-space:normal;
+  line-height:1.15;
+  cursor:pointer;
+}
+.time-clear-button,.time-cancel-button{
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface-2);
+  color:var(--v5-muted);
+}
+.time-confirm-button{
+  border:1px solid color-mix(in srgb,var(--v5-brand) 65%,transparent);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--v5-brand) 88%,#fff 4%),color-mix(in srgb,var(--v5-brand) 68%,#273f66));
+  color:#172036;
+}
+
+/* Dictado de la actividad, sin quitar la escritura manual. */
+.dictation-field{
+  position:relative;
+}
+.dictation-field input{
+  width:100%;
+  padding-right:52px!important;
+}
+.field-mic-button{
+  position:absolute;
+  top:50%;
+  right:7px;
+  width:38px;
+  height:38px;
+  transform:translateY(-50%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:11px;
+  border:1px solid var(--v5-line);
+  background:var(--v5-surface);
+  color:var(--v5-blue);
+  cursor:pointer;
+}
+.field-mic-button svg{width:18px;height:18px;}
+.field-mic-button.listening{
+  color:#fff;
+  background:#914851;
+  border-color:#c27880;
+  animation:dictationPulse 1.15s ease-in-out infinite;
+}
+.field-mic-button.unavailable{
+  opacity:.42;
+  cursor:not-allowed;
+}
+.field-helper{
+  min-height:15px;
+  margin-top:5px;
+  color:var(--v5-muted);
+  font-size:9.5px;
+  line-height:1.35;
+}
+@keyframes dictationPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(145,72,81,.24);}
+  50%{box-shadow:0 0 0 7px rgba(145,72,81,0);}
+}
+
+/* Ausencia sola: el cajón la identifica; la línea inferior queda reservada para tareas reales. */
+.cal-cell.has-absence:not(:has(.activity-line)) .activity-line{display:none;}
+
+/* Formularios y acciones sin textos recortados. */
+.modal button{
+  text-overflow:clip;
+}
+.btn-submit,.btn-cancel-modal,.btn-danger,.btn-secondary{
+  min-height:46px;
+  white-space:normal;
+  line-height:1.2;
+  overflow:visible;
+}
+
+/* Tema claro: mantener profundidad y contraste de controles nuevos. */
+html[data-theme="light"] .time-field-button,
+html[data-theme="light"] .time-adjust-button,
+html[data-theme="light"] .time-number-fields input,
+html[data-theme="light"] .time-picker-presets button,
+html[data-theme="light"] .time-clear-button,
+html[data-theme="light"] .time-cancel-button,
+html[data-theme="light"] .field-mic-button{
+  background:#fff;
+  border-color:#cfd9e4;
+}
+html[data-theme="dark"] .time-confirm-button{color:#172036;}
+
+@media(max-width:759px){
+  .time-picker-modal{
+    border-radius:24px 24px 0 0;
+  }
+  .time-picker-display{
+    grid-template-columns:54px minmax(0,1fr) 54px;
+    gap:7px;
+  }
+  .time-picker-presets{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  .time-picker-actions{
+    grid-template-columns:1fr 1fr 1.2fr;
+  }
+}
+
+/* El encabezado usa transición corta, pero ya no cambia por pequeños movimientos de scroll. */
+@media(max-width:759px){
+  .app-header,.executive-brief{
+    transition-duration:.2s!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .field-mic-button.listening{animation:none;}
+}

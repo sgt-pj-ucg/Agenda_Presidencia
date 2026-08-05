@@ -24,7 +24,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=504" />
+  <link rel="stylesheet" href="styles.css?v=505" />
 </head>
 <body>
 
@@ -154,13 +154,38 @@
 <input id="fFecha" type="date"/>
 </div>
 <div class="form-group">
-<label for="fHora">Hora</label>
-<input id="fHora" type="time"/>
+<label for="timeFieldButton">Hora</label>
+<input id="fHora" type="hidden"/>
+<button aria-haspopup="dialog" class="time-field-button" id="timeFieldButton" type="button">
+<span class="time-field-value" id="timeFieldValue">Sin hora</span>
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<circle cx="12" cy="12" r="9"></circle>
+<path d="M12 7v5l3 2"></path>
+</svg>
+</button>
+<div aria-label="Horas frecuentes" class="time-shortcuts">
+<button data-time="08:30" type="button">08:30</button>
+<button data-time="09:00" type="button">09:00</button>
+<button data-time="12:00" type="button">12:00</button>
+<button data-time="15:00" type="button">15:00</button>
+<button data-time="16:30" type="button">16:30</button>
+</div>
 </div>
 </div>
 <div class="form-group">
 <label for="fActividad">Actividad *</label>
-<input id="fActividad" maxlength="250" placeholder="Nombre de la actividad" type="text"/>
+<div class="dictation-field">
+<input id="fActividad" maxlength="250" placeholder="Escriba o dicte la actividad" type="text"/>
+<button aria-label="Dictar actividad" class="field-mic-button" id="activityVoiceBtn" title="Dictar actividad" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+<rect height="12" rx="4" width="8" x="8" y="2"></rect>
+<path d="M5 10a7 7 0 0 0 14 0"></path>
+<path d="M12 17v5"></path>
+<path d="M9 22h6"></path>
+</svg>
+</button>
+</div>
+<div class="field-helper" id="activityVoiceHint">Puede escribir o usar el micrófono.</div>
 </div>
 <div class="form-row">
 <div class="form-group">
@@ -185,7 +210,7 @@
 </div>
 <div class="form-group">
 <label for="fLugar">Lugar o enlace</label>
-<input id="fLugar" maxlength="250" placeholder="Ej.: Sala de reuniones o enlace de conexión" type="text"/>
+<input id="fLugar" maxlength="250" placeholder="Ej.: Salón Pleno, dirección o enlace de conexión" type="text"/>
 </div>
 <div class="form-group">
 <label for="fParticipantes">Participantes</label>
@@ -195,6 +220,50 @@
 <button class="btn-cancel-modal" id="btnCancelarModal" type="button">Cancelar</button>
 <p aria-live="polite" class="form-msg" id="formMsg"></p>
 <div class="sync-note">Los cambios se sincronizan con la planilla institucional.</div>
+</div>
+</div>
+
+<!-- MODAL: Selector amigable de hora -->
+<div aria-labelledby="timePickerTitle" aria-modal="true" class="modal-overlay time-picker-overlay" id="timePickerModal" role="dialog">
+<div class="modal time-picker-modal">
+<div class="modal-handle"></div>
+<div class="modal-heading">
+<div>
+<h2 id="timePickerTitle">Seleccionar hora</h2>
+<div class="modal-subtitle">Ajuste la hora en intervalos de cinco minutos.</div>
+</div>
+<button aria-label="Cerrar selector de hora" class="modal-close" id="btnCloseTimePicker" type="button">✕</button>
+</div>
+<div class="time-picker-display">
+<button aria-label="Restar quince minutos" class="time-adjust-button" id="timeMinus15" type="button">−15</button>
+<div class="time-number-fields">
+<label>
+<span>Hora</span>
+<input id="timePickerHour" inputmode="numeric" max="23" min="0" pattern="[0-9]*" type="number"/>
+</label>
+<strong>:</strong>
+<label>
+<span>Minutos</span>
+<input id="timePickerMinute" inputmode="numeric" max="59" min="0" pattern="[0-9]*" step="5" type="number"/>
+</label>
+</div>
+<button aria-label="Sumar quince minutos" class="time-adjust-button" id="timePlus15" type="button">+15</button>
+</div>
+<div class="time-picker-presets" aria-label="Horas frecuentes">
+<button data-picker-time="08:00" type="button">08:00</button>
+<button data-picker-time="08:30" type="button">08:30</button>
+<button data-picker-time="09:00" type="button">09:00</button>
+<button data-picker-time="10:00" type="button">10:00</button>
+<button data-picker-time="12:00" type="button">12:00</button>
+<button data-picker-time="15:00" type="button">15:00</button>
+<button data-picker-time="16:30" type="button">16:30</button>
+<button data-picker-time="18:00" type="button">18:00</button>
+</div>
+<div class="time-picker-actions">
+<button class="time-clear-button" id="btnClearTime" type="button">Sin hora</button>
+<button class="time-cancel-button" id="btnCancelTimePicker" type="button">Cancelar</button>
+<button class="time-confirm-button" id="btnConfirmTime" type="button">Usar hora</button>
+</div>
 </div>
 </div>
 <!-- MODAL: Confirmar eliminación -->
@@ -217,6 +286,6 @@
 <div class="toast" id="toast"></div>
 
 
-<script src="app.js?v=504" defer></script>
+<script src="app.js?v=505" defer></script>
 </body>
 </html>

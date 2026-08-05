@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · interfaz móvil con encabezado adaptativo
+// Agenda Presidencia · experiencia móvil estable, dictado y selector propio de hora
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -301,14 +301,24 @@ function formatDateKey(date){
   return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()}`;
 }
 
+function isCalendarAbsenceEvent(event){
+  const status=getStatus(event);
+  return status==='Ausente'||(status!=='Cancelada'&&isSpecialActivity(event));
+}
+
 function dayStatusSegments(dayEvents){
   const segments=[];
   const add=(name,label)=>{if(!segments.some(item=>item.name===name))segments.push({name,label});};
-  if(dayEvents.some(event=>getStatus(event)==='Ausente'||isSpecialActivity(event))) add('absence','Ausencia');
-  if(dayEvents.some(event=>getStatus(event)==='Por Confirmar')) add('confirm','Por confirmar');
-  if(dayEvents.some(event=>getStatus(event)==='Pendiente')) add('pending','Pendiente');
-  if(dayEvents.some(event=>getStatus(event)==='Confirmada')) add('confirmed','Confirmada');
-  if(dayEvents.some(event=>getStatus(event)==='Cancelada')) add('cancelled','Cancelada');
+  const absenceEvents=dayEvents.filter(isCalendarAbsenceEvent);
+  const taskEvents=dayEvents.filter(event=>!isCalendarAbsenceEvent(event));
+
+  // Una ausencia sola se reconoce mediante el cajón gris azulado, sin una segunda raya inferior.
+  // La raya de ausencia aparece únicamente cuando el mismo día también contiene tareas reales.
+  if(absenceEvents.length&&taskEvents.length) add('absence','Ausencia');
+  if(taskEvents.some(event=>getStatus(event)==='Por Confirmar')) add('confirm','Por confirmar');
+  if(taskEvents.some(event=>getStatus(event)==='Pendiente')) add('pending','Pendiente');
+  if(taskEvents.some(event=>getStatus(event)==='Confirmada')) add('confirmed','Confirmada');
+  if(taskEvents.some(event=>getStatus(event)==='Cancelada')) add('cancelled','Cancelada');
   return segments.slice(0,4);
 }
 
@@ -392,11 +402,12 @@ function renderCalendar() {
     const key=formatDateKey(cell.date);
     const dayEvents=eventsByDate.get(key)||[];
     const segments=dayStatusSegments(dayEvents);
+    const hasAbsence=dayEvents.some(isCalendarAbsenceEvent);
     const isToday=sameDay(cell.date,today);
     const isSelected=selectedCalDate&&sameDay(cell.date,selectedCalDate);
     const line=segments.length?`<span class="activity-line" aria-hidden="true">${segments.map(segment=>`<i class="${segment.name}"></i>`).join('')}</span>`:'';
-    const labels=segments.map(segment=>segment.label).join(', ');
-    return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${segments.some(segment=>segment.name==='absence')?'has-absence':''}" data-date="${key}" type="button" aria-label="${key}${dayEvents.length?`, ${dayEvents.length} actividades, ${labels}`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${line}</button>`;
+    const labels=[hasAbsence?'Ausencia':'',...segments.map(segment=>segment.label)].filter(Boolean).join(', ');
+    return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${hasAbsence?'has-absence':''}" data-date="${key}" type="button" aria-label="${key}${dayEvents.length?`, ${dayEvents.length} actividades, ${labels}`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${line}</button>`;
   }).join('');
   const selectedPanel=renderSelectedDayPanel();
   return `<section class="calendar-workspace">
@@ -517,9 +528,11 @@ function openStatusDropdown(pill,event) {
   dropdown.innerHTML=STATUS_OPTIONS.map(option=>`<button class="status-option" data-status="${option.s}" type="button" style="color:${option.color}"><span class="opt-dot" style="background:${option.dot}"></span>${option.icon} ${option.s}${current===option.s?' ✔':''}</button>`).join('');
   document.body.appendChild(dropdown);
   const rect=pill.getBoundingClientRect();
-  const height=STATUS_OPTIONS.length*44;
-  dropdown.style.top=(rect.bottom+4+height>window.innerHeight?Math.max(8,rect.top-height-4):rect.bottom+4)+'px';
-  dropdown.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-205))+'px';
+  const width=Math.min(248,window.innerWidth-20);
+  dropdown.style.width=`${width}px`;
+  const height=dropdown.offsetHeight;
+  dropdown.style.top=(rect.bottom+6+height>window.innerHeight?Math.max(10,rect.top-height-6):rect.bottom+6)+'px';
+  dropdown.style.left=Math.max(10,Math.min(rect.left,window.innerWidth-width-10))+'px';
   activeDropdown=dropdown;
   dropdown.querySelectorAll('.status-option').forEach(option=>option.addEventListener('click',async click=>{
     click.stopPropagation();
@@ -554,8 +567,7 @@ function setView(view) {
   currentView=view;
   document.body.dataset.view=view;
   document.body.classList.remove('header-collapsed');
-  adaptiveHeaderLastY=window.scrollY;
-  adaptiveHeaderDirectionAnchor=window.scrollY;
+  adaptiveHeaderPinnedOpenAt=null;
   document.querySelectorAll('.nav-btn:not(.nav-add)').forEach(button=>button.classList.remove('active'));
   const map={agenda:'navAgenda',calendario:'navCalendar',buscar:'navSearch',mes:'navMes'};
   document.getElementById(map[view])?.classList.add('active');
@@ -582,10 +594,26 @@ document.getElementById('navSearch').addEventListener('click',()=>setView('busca
 document.getElementById('briefCalendarButton')?.addEventListener('click',()=>{setView('calendario');render();});
 
 const activityModal=document.getElementById('activityModal');
+const timePickerModal=document.getElementById('timePickerModal');
 const deleteModal=document.getElementById('deleteModal');
+const hiddenTimeInput=document.getElementById('fHora');
+const timeFieldValue=document.getElementById('timeFieldValue');
+const timePickerHour=document.getElementById('timePickerHour');
+const timePickerMinute=document.getElementById('timePickerMinute');
+let timePickerTotalMinutes=9*60;
+
+function setActivityTime(value=''){
+  const normalized=/^\d{2}:\d{2}$/.test(value)?value:'';
+  hiddenTimeInput.value=normalized;
+  timeFieldValue.textContent=normalized||'Sin hora';
+  document.querySelectorAll('.time-shortcuts button').forEach(button=>{
+    button.classList.toggle('active',button.dataset.time===normalized);
+  });
+}
 
 function resetActivityForm() {
-  ['fHora','fActividad','fLugar','fParticipantes'].forEach(id=>document.getElementById(id).value='');
+  ['fActividad','fLugar','fParticipantes'].forEach(id=>document.getElementById(id).value='');
+  setActivityTime('');
   document.getElementById('fModalidad').value='Presencial';
   document.getElementById('fEstado').value='Confirmada';
   document.getElementById('formMsg').textContent='';
@@ -602,7 +630,7 @@ function openActivityModal(mode,event=null) {
     subtitle.textContent='Modifica la fecha, actividad, modalidad, estado y demás antecedentes.';
     save.textContent='Guardar cambios';
     document.getElementById('fFecha').value=dateToInput(editingEvent.FECHA);
-    document.getElementById('fHora').value=formatTime(editingEvent.HORA);
+    setActivityTime(formatTime(editingEvent.HORA));
     document.getElementById('fActividad').value=editingEvent.ACTIVIDAD||'';
     document.getElementById('fModalidad').value=normalizeModality(editingEvent.MODALIDAD);
     document.getElementById('fEstado').value=getStatus(editingEvent);
@@ -616,12 +644,104 @@ function openActivityModal(mode,event=null) {
   setTimeout(()=>document.getElementById('fActividad').focus(),280);
 }
 
-function closeActivityModal() { activityModal.classList.remove('open'); editingEvent=null; }
+function closeActivityModal() {
+  activityModal.classList.remove('open');
+  timePickerModal.classList.remove('open');
+  editingEvent=null;
+  if(activityDictationRecognition&&activityVoiceBtn.classList.contains('listening')) activityDictationRecognition.stop();
+}
 
 document.getElementById('navAdd').addEventListener('click',()=>openActivityModal('add'));
 document.getElementById('btnCancelarModal').addEventListener('click',closeActivityModal);
 document.getElementById('btnCloseActivityModal').addEventListener('click',closeActivityModal);
+
 activityModal.addEventListener('click',event=>{if(event.target===activityModal)closeActivityModal();});
+
+function clampTimePart(value,min,max){
+  const number=Number.parseInt(value,10);
+  return Number.isFinite(number)?Math.min(max,Math.max(min,number)):min;
+}
+
+function roundToFive(value){
+  return Math.min(55,Math.max(0,Math.round(value/5)*5));
+}
+
+function syncTimePickerFields(){
+  const total=((timePickerTotalMinutes%(24*60))+(24*60))%(24*60);
+  const hour=Math.floor(total/60);
+  const minute=total%60;
+  timePickerHour.value=String(hour).padStart(2,'0');
+  timePickerMinute.value=String(minute).padStart(2,'0');
+}
+
+function readTimePickerFields(){
+  const hour=clampTimePart(timePickerHour.value,0,23);
+  const minute=roundToFive(clampTimePart(timePickerMinute.value,0,59));
+  timePickerTotalMinutes=hour*60+minute;
+  syncTimePickerFields();
+}
+
+function defaultPickerTime(){
+  const current=new Date();
+  const rounded=Math.ceil((current.getHours()*60+current.getMinutes())/15)*15;
+  return rounded%(24*60);
+}
+
+function openTimePicker(){
+  if(hiddenTimeInput.value){
+    const [hour,minute]=hiddenTimeInput.value.split(':').map(Number);
+    timePickerTotalMinutes=hour*60+minute;
+  }else{
+    timePickerTotalMinutes=defaultPickerTime();
+  }
+  syncTimePickerFields();
+  timePickerModal.classList.add('open');
+  setTimeout(()=>timePickerHour.focus(),220);
+}
+
+function closeTimePicker(){
+  timePickerModal.classList.remove('open');
+}
+
+document.getElementById('timeFieldButton').addEventListener('click',openTimePicker);
+document.getElementById('btnCloseTimePicker').addEventListener('click',closeTimePicker);
+document.getElementById('btnCancelTimePicker').addEventListener('click',closeTimePicker);
+timePickerModal.addEventListener('click',event=>{if(event.target===timePickerModal)closeTimePicker();});
+
+document.getElementById('timeMinus15').addEventListener('click',()=>{
+  readTimePickerFields();
+  timePickerTotalMinutes=(timePickerTotalMinutes-15+24*60)%(24*60);
+  syncTimePickerFields();
+});
+document.getElementById('timePlus15').addEventListener('click',()=>{
+  readTimePickerFields();
+  timePickerTotalMinutes=(timePickerTotalMinutes+15)%(24*60);
+  syncTimePickerFields();
+});
+timePickerHour.addEventListener('change',readTimePickerFields);
+timePickerMinute.addEventListener('change',readTimePickerFields);
+
+document.querySelectorAll('[data-picker-time]').forEach(button=>button.addEventListener('click',()=>{
+  const [hour,minute]=button.dataset.pickerTime.split(':').map(Number);
+  timePickerTotalMinutes=hour*60+minute;
+  syncTimePickerFields();
+}));
+
+document.getElementById('btnClearTime').addEventListener('click',()=>{
+  setActivityTime('');
+  closeTimePicker();
+});
+document.getElementById('btnConfirmTime').addEventListener('click',()=>{
+  readTimePickerFields();
+  const hour=Math.floor(timePickerTotalMinutes/60);
+  const minute=timePickerTotalMinutes%60;
+  setActivityTime(`${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
+  closeTimePicker();
+});
+document.querySelectorAll('.time-shortcuts button').forEach(button=>button.addEventListener('click',()=>{
+  setActivityTime(button.dataset.time||'');
+}));
+
 
 function getFormEvent() {
   const inputDate=document.getElementById('fFecha').value;
@@ -778,6 +898,47 @@ function handleSearch(query) {
 searchInput.addEventListener('input',event=>handleSearch(event.target.value));
 document.getElementById('clearSearch').addEventListener('click',()=>{searchInput.value='';handleSearch('');searchInput.focus();});
 
+
+const activityVoiceBtn=document.getElementById('activityVoiceBtn');
+const activityVoiceHint=document.getElementById('activityVoiceHint');
+const ActivitySpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let activityDictationRecognition=null;
+
+if(!ActivitySpeechRecognition){
+  activityVoiceBtn.disabled=true;
+  activityVoiceBtn.classList.add('unavailable');
+  activityVoiceHint.textContent='El dictado no está disponible en este navegador; puede escribir normalmente.';
+}else{
+  activityDictationRecognition=new ActivitySpeechRecognition();
+  activityDictationRecognition.lang='es-CL';
+  activityDictationRecognition.continuous=false;
+  activityDictationRecognition.interimResults=false;
+  activityDictationRecognition.onstart=()=>{
+    activityVoiceBtn.classList.add('listening');
+    activityVoiceHint.textContent='Escuchando… hable con naturalidad.';
+  };
+  activityDictationRecognition.onend=()=>{
+    activityVoiceBtn.classList.remove('listening');
+    if(activityVoiceHint.textContent.startsWith('Escuchando')) activityVoiceHint.textContent='Puede escribir o usar el micrófono.';
+  };
+  activityDictationRecognition.onerror=()=>{
+    activityVoiceBtn.classList.remove('listening');
+    activityVoiceHint.textContent='No fue posible escuchar. Puede intentarlo nuevamente o escribir.';
+  };
+  activityDictationRecognition.onresult=event=>{
+    const transcript=event.results[0][0].transcript.trim();
+    const field=document.getElementById('fActividad');
+    field.value=[field.value.trim(),transcript].filter(Boolean).join(' ');
+    field.focus();
+    field.setSelectionRange(field.value.length,field.value.length);
+    activityVoiceHint.textContent='Dictado incorporado. Puede corregirlo antes de guardar.';
+  };
+  activityVoiceBtn.addEventListener('click',()=>{
+    if(activityVoiceBtn.classList.contains('listening')) activityDictationRecognition.stop();
+    else activityDictationRecognition.start();
+  });
+}
+
 const voiceBtn=document.getElementById('voiceBtn');
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
 if (!SpeechRecognition) voiceBtn.style.opacity='.35';
@@ -798,6 +959,7 @@ function showToast(message) {
 document.addEventListener('keydown',event=>{
   if(event.key!=='Escape') return;
   closeDropdown();
+  if(timePickerModal.classList.contains('open')) { closeTimePicker(); return; }
   if(activityModal.classList.contains('open')) closeActivityModal();
   if(deleteModal.classList.contains('open')) closeDeleteModal();
 });
@@ -805,61 +967,65 @@ document.addEventListener('keydown',event=>{
 
 
 
-// Encabezado adaptativo móvil: se repliega al bajar en Calendario y reaparece al subir.
-let adaptiveHeaderLastY = window.scrollY;
-let adaptiveHeaderFrame = 0;
-let adaptiveHeaderDirectionAnchor = window.scrollY;
+// Encabezado adaptativo móvil estable: usa umbrales separados para impedir parpadeos.
+let adaptiveHeaderFrame=0;
+let adaptiveHeaderPinnedOpenAt=null;
 
-function expandAdaptiveHeader() {
+function expandAdaptiveHeader(){
   document.body.classList.remove('header-collapsed');
 }
 
-function updateAdaptiveHeader({forceExpanded=false}={}) {
-  const mobile = window.matchMedia('(max-width: 759px)').matches;
-  const calendarView = currentView === 'calendario';
-  const y = Math.max(0, window.scrollY);
+function collapseAdaptiveHeader(){
+  document.body.classList.add('header-collapsed');
+}
 
-  if (forceExpanded || !mobile || !calendarView) {
+function updateAdaptiveHeader({forceExpanded=false}={}){
+  const mobile=window.matchMedia('(max-width: 759px)').matches;
+  const calendarView=currentView==='calendario';
+  const y=Math.max(0,window.scrollY);
+
+  if(forceExpanded||!mobile||!calendarView){
+    adaptiveHeaderPinnedOpenAt=null;
     expandAdaptiveHeader();
-    adaptiveHeaderLastY = y;
-    adaptiveHeaderDirectionAnchor = y;
     return;
   }
 
-  if (y <= 18) {
+  if(y<=24){
+    adaptiveHeaderPinnedOpenAt=null;
     expandAdaptiveHeader();
-    adaptiveHeaderDirectionAnchor = y;
-  } else {
-    const delta = y - adaptiveHeaderLastY;
-
-    if (delta > 0 && y - adaptiveHeaderDirectionAnchor > 22 && y > 54) {
-      document.body.classList.add('header-collapsed');
-      adaptiveHeaderDirectionAnchor = y;
-    } else if (delta < 0 && adaptiveHeaderDirectionAnchor - y > 14) {
-      expandAdaptiveHeader();
-      adaptiveHeaderDirectionAnchor = y;
-    }
+    return;
   }
 
-  adaptiveHeaderLastY = y;
+  if(adaptiveHeaderPinnedOpenAt!==null){
+    if(y>adaptiveHeaderPinnedOpenAt+48){
+      adaptiveHeaderPinnedOpenAt=null;
+      collapseAdaptiveHeader();
+    }else{
+      expandAdaptiveHeader();
+    }
+    return;
+  }
+
+  if(y>=112) collapseAdaptiveHeader();
 }
 
-window.addEventListener('scroll', () => {
-  if (adaptiveHeaderFrame) return;
-  adaptiveHeaderFrame = requestAnimationFrame(() => {
-    adaptiveHeaderFrame = 0;
+window.addEventListener('scroll',()=>{
+  if(adaptiveHeaderFrame) return;
+  adaptiveHeaderFrame=requestAnimationFrame(()=>{
+    adaptiveHeaderFrame=0;
     updateAdaptiveHeader();
   });
-}, {passive:true});
+},{passive:true});
 
-window.addEventListener('resize', () => updateAdaptiveHeader({forceExpanded:true}));
+window.addEventListener('resize',()=>updateAdaptiveHeader({forceExpanded:true}));
 
-document.getElementById('appHeader')?.addEventListener('click', event => {
-  if (
-    currentView === 'calendario' &&
-    document.body.classList.contains('header-collapsed') &&
+document.getElementById('appHeader')?.addEventListener('click',event=>{
+  if(
+    currentView==='calendario'&&
+    document.body.classList.contains('header-collapsed')&&
     !event.target.closest('button')
-  ) {
+  ){
+    adaptiveHeaderPinnedOpenAt=window.scrollY;
     expandAdaptiveHeader();
   }
 });
