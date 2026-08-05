@@ -1,11 +1,12 @@
 
-// Agenda Presidencia 5.0 · conserva el backend operativo de la versión estable
+// Agenda Presidencia 5.0.2 · interfaz móvil refinada; conserva el backend operativo
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
 let allEvents = [];
 let currentTab = 'hoy';
 let currentView = 'agenda';
+document.body.dataset.view = currentView;
 let calendarDate = new Date();
 let selectedCalDate = null;
 let activeDropdown = null;
@@ -33,11 +34,11 @@ const SPECIAL_KEYWORDS = [
 ];
 
 const STATUS_OPTIONS = [
-  {s:'Confirmada', color:'#70f0a3', dot:'#00e676', icon:'✓'},
-  {s:'Por Confirmar', color:'#d6a8ff', dot:'#b978f0', icon:'?'},
-  {s:'Pendiente', color:'#ffc45a', dot:'#ffb300', icon:'⏳'},
-  {s:'Ausente', color:'#a9bad8', dot:'#8398bd', icon:'⊘'},
-  {s:'Cancelada', color:'#ff8994', dot:'#ff4757', icon:'✕'},
+  {s:'Confirmada', color:'#78bba3', dot:'#4f9c83', icon:'✓'},
+  {s:'Por Confirmar', color:'#a99dc5', dot:'#7d72a7', icon:'?'},
+  {s:'Pendiente', color:'#d1aa70', dot:'#b98135', icon:'⏳'},
+  {s:'Ausente', color:'#a4b1c5', dot:'#7186a8', icon:'⊘'},
+  {s:'Cancelada', color:'#d99a9f', dot:'#b75d65', icon:'✕'},
 ];
 
 function escapeHTML(value='') {
@@ -149,10 +150,10 @@ function timeToMin(value) {
 
 function modalityMeta(value) {
   const modality=normalizeModality(value);
-  if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:'📍',label:'ACTIVIDAD PRESENCIAL'};
-  if (modality==='Telemática') return {className:'telematica',badge:'b-telematica',icon:'💻',label:'ACTIVIDAD TELEMÁTICA'};
-  if (modality==='Híbrida') return {className:'hibrida',badge:'b-hibrida',icon:'🔀',label:'ACTIVIDAD HÍBRIDA'};
-  return {className:'otro',badge:'b-otro',icon:'📌',label:'OTRA MODALIDAD'};
+  if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:'●',label:'Presencial'};
+  if (modality==='Telemática') return {className:'telematica',badge:'b-telematica',icon:'◉',label:'Telemática'};
+  if (modality==='Híbrida') return {className:'hibrida',badge:'b-hibrida',icon:'◐',label:'Híbrida'};
+  return {className:'otro',badge:'b-otro',icon:'•',label:'Otra modalidad'};
 }
 
 function statusEmoji(status) {
@@ -211,10 +212,10 @@ function updateHeaderStats() {
   const pending=todayEvents.filter(event=>getStatus(event)==='Pendiente').length;
   const absent=todayEvents.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event)).length;
   document.getElementById('headerStats').innerHTML=`
-    <div class="stat-chip primary"><span class="dot" style="background:#31c48d"></span>${todayEvents.length} hoy</div>
-    ${confirmed?`<div class="stat-chip"><span class="dot" style="background:#31c48d"></span>${confirmed} confirmada${confirmed===1?'':'s'}</div>`:''}
-    ${toConfirm?`<div class="stat-chip"><span class="dot" style="background:#7c83fd"></span>${toConfirm} por confirmar</div>`:''}
-    ${pending?`<div class="stat-chip"><span class="dot" style="background:#e6a23c"></span>${pending} pendiente${pending===1?'':'s'}</div>`:''}
+    <div class="stat-chip primary"><span class="dot" style="background:#4f9c83"></span>${todayEvents.length} hoy</div>
+    ${confirmed?`<div class="stat-chip"><span class="dot" style="background:#4f9c83"></span>${confirmed} confirmada${confirmed===1?'':'s'}</div>`:''}
+    ${toConfirm?`<div class="stat-chip"><span class="dot" style="background:#7d72a7"></span>${toConfirm} por confirmar</div>`:''}
+    ${pending?`<div class="stat-chip"><span class="dot" style="background:#b98135"></span>${pending} pendiente${pending===1?'':'s'}</div>`:''}
     ${absent?`<div class="stat-chip"><span class="dot" style="background:#7186a8"></span>${absent} ausencia${absent===1?'':'s'}</div>`:''}`;
   updateExecutiveBrief(today,todayEvents);
 }
@@ -530,6 +531,7 @@ function bindCardActions() {
 
 function setView(view) {
   currentView=view;
+  document.body.dataset.view=view;
   document.querySelectorAll('.nav-btn:not(.nav-add)').forEach(button=>button.classList.remove('active'));
   const map={agenda:'navAgenda',calendario:'navCalendar',buscar:'navSearch',mes:'navMes'};
   document.getElementById(map[view])?.classList.add('active');

@@ -1657,3 +1657,187 @@ html[data-theme="light"] .cal-cell.has-absence.selected{
     filter:brightness(1.04);
   }
 }
+
+
+/* ================================================================
+   AGENDA PRESIDENCIA 5.0.2 — REFINAMIENTO MOBILE-FIRST
+   Paleta sobria, encabezado compacto y calendario protagonista.
+   ================================================================ */
+:root{
+  --v5-green:#4f9c83;
+  --v5-purple:#7d72a7;
+  --v5-amber:#b98135;
+  --v5-danger:#b75d65;
+
+  --mod-presencial:#67b49d;
+  --mod-presencial-strong:#4a947f;
+  --mod-presencial-soft:rgba(103,180,157,.095);
+  --mod-presencial-border:rgba(103,180,157,.34);
+
+  --mod-telematica:#789bc9;
+  --mod-telematica-strong:#5e7fac;
+  --mod-telematica-soft:rgba(120,155,201,.095);
+  --mod-telematica-border:rgba(120,155,201,.35);
+
+  --mod-hibrida-a:#9a8bbd;
+  --mod-hibrida-b:#70a4ad;
+  --mod-hibrida-soft:rgba(154,139,189,.09);
+  --mod-hibrida-border:rgba(154,139,189,.35);
+}
+html[data-theme="light"]{
+  --v5-green:#2e7965;
+  --v5-purple:#66598f;
+  --v5-amber:#936421;
+  --v5-danger:#9f4f58;
+
+  --mod-presencial:#257a67;
+  --mod-presencial-strong:#1e6656;
+  --mod-presencial-soft:#edf7f4;
+  --mod-presencial-border:#b3d8ce;
+
+  --mod-telematica:#3e659a;
+  --mod-telematica-strong:#31527f;
+  --mod-telematica-soft:#eef3f9;
+  --mod-telematica-border:#bac9dc;
+
+  --mod-hibrida-a:#6e5d98;
+  --mod-hibrida-b:#3f7984;
+  --mod-hibrida-soft:#f3f0f8;
+  --mod-hibrida-border:#c9c0d9;
+}
+
+/* Menos brillo, más jerarquía: la tarjeta sigue siendo reconocible sin parecer neón. */
+.event-card.presencial,
+.event-card.telematica,
+.event-card.hibrida{
+  box-shadow:none!important;
+}
+.event-card.presencial{
+  background:linear-gradient(90deg,var(--mod-presencial-soft),transparent 29%),var(--v5-card);
+}
+.event-card.telematica{
+  background:linear-gradient(90deg,var(--mod-telematica-soft),transparent 29%),var(--v5-card);
+}
+.event-card.hibrida{
+  background:linear-gradient(90deg,var(--mod-hibrida-soft),transparent 31%),var(--v5-card);
+}
+.event-card.hibrida::after{width:3px;opacity:.92;}
+.mode-banner{
+  min-height:29px;
+  padding:5px 11px!important;
+  font-size:9px!important;
+  letter-spacing:.055em!important;
+  text-transform:none;
+}
+.mode-banner .mode-icon{
+  width:18px;height:18px;flex-basis:18px;border-radius:6px;font-size:9px;
+}
+.mode-presencial,.mode-telematica,.mode-hibrida{
+  background:transparent!important;
+  border-bottom-color:var(--v5-line)!important;
+}
+.b-presencial,.b-telematica,.b-hibrida{font-weight:750;}
+
+/* Superficies más tranquilas y transición de tema sin destellos. */
+body,.app-header,.tabs-wrapper,.calendar-card,.day-panel,.event-card,.bottom-nav,.modal{
+  transition:background-color .22s ease,border-color .22s ease,color .22s ease,box-shadow .22s ease;
+}
+
+/* El calendario gana altura útil en la pantalla móvil. */
+@media (max-width:759px){
+  .app-header{
+    padding:max(7px,env(safe-area-inset-top)) 10px 7px;
+  }
+  .header-top{min-height:38px;gap:8px;}
+  .header-escudo{width:34px;height:34px;border-radius:10px;}
+  .header-escudo img{width:23px;height:23px;}
+  .agenda-label{font-size:6px;letter-spacing:1.55px;line-height:1;}
+  .header-text h1{font-size:12.5px;line-height:1.15;gap:4px;white-space:nowrap;}
+  .header-text .subtitle,.version-pill{display:none;}
+  .header-actions{gap:5px;margin-left:auto;}
+  .theme-toggle{width:56px;height:32px;border-radius:11px;}
+  .theme-toggle::before{width:24px;height:24px;top:3px;left:3px;}
+  html[data-theme="dark"] .theme-toggle::before{transform:translateX(25px);}
+  .theme-icon{font-size:12px;}
+  .header-refresh{width:32px;height:32px;border-radius:10px;font-size:17px;}
+
+  .executive-brief{
+    min-height:42px;
+    margin-top:5px;
+    padding:7px 8px 7px 10px;
+    gap:8px;
+    border-radius:13px;
+    background:var(--v5-card);
+  }
+  .brief-copy{gap:0;overflow:hidden;}
+  .brief-kicker{display:none;}
+  .brief-title{font-size:11.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brief-subtitle{font-size:9.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brief-calendar-button{width:30px;height:30px;border-radius:9px;flex:0 0 30px;}
+  .brief-calendar-button svg{width:15px;height:15px;}
+  .header-stats{display:none;}
+
+  /* En la vista Calendario, la cabecera se reduce a la barra de identidad. */
+  body[data-view="calendario"] .executive-brief{display:none;}
+  body[data-view="calendario"] .app-header{padding-bottom:6px;}
+
+  /* Las pestañas ya no compiten como una segunda cabecera fija. */
+  .tabs-wrapper{position:relative;top:auto;padding:6px 8px;}
+  body[data-view="calendario"] .tabs-wrapper{display:none;}
+  .tab{padding:7px 10px;font-size:11px;border-radius:10px;}
+  .search-bar{padding:7px 9px;}
+  .content{padding:9px 8px 18px;}
+  .updated-bar{margin-bottom:6px;font-size:9px;}
+
+  .calendar-card{padding:12px 9px 10px;border-radius:19px;}
+  .cal-header{margin-bottom:10px;}
+  .cal-eyebrow{display:none;}
+  .cal-title{font-size:17px;}
+  .cal-subtitle{font-size:9px;margin-top:1px;}
+  .cal-nav{width:36px;height:36px;border-radius:10px;}
+  .cal-grid{gap:4px;}
+  .cal-cell{min-height:43px;border-radius:11px;}
+  .cal-day-number{font-size:12.5px;}
+  .calendar-legend{padding-top:9px;margin-top:6px;gap:10px;font-size:8.5px;}
+}
+
+/* Ausencia: reconocible por superficie, borde lateral y sello de esquina. */
+.cal-cell.has-absence:not(.selected){
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--v5-absence) 15%,transparent),transparent 58%),
+    var(--absence-cell-bg);
+  border-color:var(--absence-cell-border);
+  box-shadow:inset 3px 0 0 var(--v5-absence);
+}
+.cal-cell.has-absence::before{
+  top:5px;left:7px;right:auto;width:13px;height:2px;opacity:.82;
+}
+.cal-cell.has-absence::after{
+  content:"";
+  position:absolute;
+  top:6px;right:6px;
+  width:6px;height:6px;border-radius:2px;
+  background:var(--v5-absence);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--v5-absence) 15%,transparent);
+}
+.cal-cell.has-absence.selected{
+  box-shadow:
+    inset 3px 0 0 var(--v5-absence),
+    0 0 0 2px color-mix(in srgb,var(--v5-brand) 19%,transparent);
+}
+.cal-cell.has-absence.selected::after{background:var(--v5-absence);}
+
+/* Estados accesibles y sin fluorescencia. */
+.s-confirmada{color:var(--v5-green)!important;background:color-mix(in srgb,var(--v5-green) 12%,transparent)!important;}
+.s-por-confirmar{color:var(--v5-purple)!important;background:color-mix(in srgb,var(--v5-purple) 12%,transparent)!important;}
+.s-pendiente{color:var(--v5-amber)!important;background:color-mix(in srgb,var(--v5-amber) 12%,transparent)!important;}
+.s-cancelada{color:var(--v5-danger)!important;background:color-mix(in srgb,var(--v5-danger) 11%,transparent)!important;}
+
+/* Interacción táctil y teclado visible, sin animaciones decorativas excesivas. */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid color-mix(in srgb,var(--v5-blue) 72%,white 8%);
+  outline-offset:2px;
+}
+@media (hover:hover){
+  .event-card.presencial:hover,.event-card.telematica:hover,.event-card.hibrida:hover{transform:translateY(-1px);}
+}
