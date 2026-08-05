@@ -3360,25 +3360,7 @@ button.brief-signal{cursor:pointer;text-align:left;}
 .event-card.temporal-past{opacity:.72;filter:saturate(.82);}
 .event-card.temporal-past:hover{opacity:.9;filter:saturate(.95);}
 
-/* Línea de tiempo diaria */
-.day-timeline{display:flex;flex-direction:column;gap:0;padding:2px 0 4px;}
-.timeline-item{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;position:relative;opacity:0;transform:translateY(8px);animation:v6TimelineIn .34s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--timeline-index) * 45ms);}
-@keyframes v6TimelineIn{to{opacity:1;transform:none;}}
-.timeline-axis{position:relative;display:flex;flex-direction:column;align-items:center;min-height:100%;}
-.timeline-time{width:100%;padding-top:12px;color:var(--v5-muted);font-size:9px;font-weight:800;text-align:right;padding-right:20px;white-space:nowrap;}
-.timeline-node{position:absolute;right:4px;top:16px;width:11px;height:11px;border-radius:50%;background:var(--v5-surface);border:3px solid var(--v6-timeline);z-index:2;box-shadow:0 0 0 3px var(--v5-surface);}
-.timeline-line{position:absolute;right:8px;top:29px;bottom:-2px;width:2px;background:linear-gradient(var(--v5-line),color-mix(in srgb,var(--v5-line) 36%,transparent));}
-.timeline-item:last-child .timeline-line{display:none;}
-.timeline-item.presencial .timeline-node{border-color:var(--mod-presencial-strong);}
-.timeline-item.telematica .timeline-node{border-color:var(--mod-telematica-strong);}
-.timeline-item.hibrida .timeline-node{border-color:var(--mod-hibrida-a);}
-.timeline-item.temporal-next .timeline-node{background:var(--v6-next);border-color:#fff0bd;box-shadow:0 0 0 4px color-mix(in srgb,var(--v6-next) 18%,var(--v5-surface)),0 0 18px color-mix(in srgb,var(--v6-next) 28%,transparent);}
-.timeline-content{min-width:0;padding-bottom:8px;}
-.timeline-content .event-card{margin-bottom:0;}
-.timeline-content .time-bubble{display:none;}
-.timeline-content .card-top{padding-left:13px;}
-
-/* Hoy con más protagonismo */
+/* Tarjetas diarias amplias */
 .cal-cell.today{
   border-color:color-mix(in srgb,var(--v6-gold) 78%,transparent)!important;
   background:linear-gradient(145deg,color-mix(in srgb,var(--v6-gold) 13%,transparent),transparent 66%);
@@ -3439,9 +3421,6 @@ button.brief-signal{cursor:pointer;text-align:left;}
   .day-panel-copy h3{font-size:19px;}
   .cal-cell{min-height:72px;height:72px;aspect-ratio:auto;border-radius:16px;}
   .cal-day-number{font-size:16px;}
-  .timeline-item{grid-template-columns:74px minmax(0,1fr);gap:12px;}
-  .timeline-time{font-size:10px;padding-right:22px;}
-  .timeline-content .card-title{font-size:15px;}
   .date-group{break-inside:avoid;}
   body[data-view="agenda"] .content,body[data-view="mes"] .content{grid-template-columns:repeat(2,minmax(0,1fr));}
   body[data-view="agenda"] .updated-bar,body[data-view="mes"] .updated-bar{grid-column:1/-1;}
@@ -3459,11 +3438,6 @@ button.brief-signal{cursor:pointer;text-align:left;}
   .brief-signal{flex:0 0 auto;max-width:84vw;}
   .brief-signal.next{max-width:88vw;}
   .brief-signal span{max-width:190px;}
-  .timeline-item{grid-template-columns:54px minmax(0,1fr);gap:7px;}
-  .timeline-time{font-size:8px;padding-right:17px;}
-  .timeline-node{right:2px;width:10px;height:10px;}
-  .timeline-line{right:6px;}
-  .timeline-content .mode-banner{padding-left:9px!important;padding-right:8px!important;}
   .temporal-badge{font-size:7px;padding:3px 6px;}
   .event-card.temporal-past{opacity:.76;}
 }
@@ -3471,11 +3445,9 @@ button.brief-signal{cursor:pointer;text-align:left;}
 html[data-theme="light"] .brief-signal{background:rgba(255,255,255,.66);}
 html[data-theme="light"] .event-card.temporal-next{box-shadow:0 14px 32px rgba(150,108,21,.13);}
 html[data-theme="light"] .cal-cell.today{background:linear-gradient(145deg,#fff2c9,#fffaf0 70%);color:#493814;}
-html[data-theme="light"] .timeline-node{box-shadow:0 0 0 3px #fff;}
 
 @media (prefers-reduced-motion:reduce){
-  .signal-dot,.temporal-badge.next span,.timeline-item,.calendar-motion-next .calendar-card,.calendar-motion-prev .calendar-card,.cal-cell.selected,.voice-btn.listening,.toast.show{animation:none!important;}
-  .timeline-item{opacity:1;transform:none;}
+  .signal-dot,.temporal-badge.next span,.calendar-motion-next .calendar-card,.calendar-motion-prev .calendar-card,.cal-cell.selected,.voice-btn.listening,.toast.show{animation:none!important;}
 }
 
 /* Corrección de composición: las reglas históricas no deben forzar el calendario a ocupar ambas columnas. */
@@ -3485,5 +3457,116 @@ html[data-theme="light"] .timeline-node{box-shadow:0 0 0 3px #fff;}
     grid-column:auto!important;
     margin-left:0;
     margin-right:0;
+  }
+}
+
+/* ==========================================================================
+   6.0.1 · detalle diario con tarjetas completas y horarios legibles
+   ========================================================================== */
+
+.day-panel-events{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.day-panel-events>.event-card{
+  width:100%;
+  margin:0;
+  animation:v601CardIn .3s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.day-panel-events>.event-card:nth-child(2){animation-delay:35ms;}
+.day-panel-events>.event-card:nth-child(3){animation-delay:70ms;}
+.day-panel-events>.event-card:nth-child(4){animation-delay:105ms;}
+.day-panel-events>.event-card:nth-child(n+5){animation-delay:130ms;}
+
+@keyframes v601CardIn{
+  from{opacity:0;transform:translateY(7px);}
+  to{opacity:1;transform:none;}
+}
+
+.day-panel .event-card .card-top{
+  gap:13px;
+  padding:14px 13px 12px;
+}
+
+.day-panel .event-card .time-bubble{
+  display:grid;
+  place-items:center;
+  min-width:58px;
+  min-height:47px;
+  padding:8px 7px;
+  border-radius:13px;
+}
+
+.day-panel .event-card .time-bubble .t-hour{
+  font-size:16px;
+  font-weight:850;
+  letter-spacing:-.2px;
+}
+
+.day-panel .event-card .time-bubble.no-time .t-hour{
+  font-size:11px;
+  letter-spacing:0;
+}
+
+.day-panel .event-card .card-title{
+  font-size:15px;
+  line-height:1.35;
+  margin-bottom:8px;
+}
+
+.day-panel .event-card .badge{
+  font-size:10.5px;
+  padding:4px 8px;
+}
+
+.day-panel .event-card .mode-banner{
+  min-height:35px;
+  padding-left:12px!important;
+  padding-right:10px!important;
+}
+
+.day-panel .event-card .status-row{
+  min-height:48px;
+  padding:8px 12px;
+}
+
+@media (min-width:1100px){
+  .day-panel-events{gap:12px;}
+  .day-panel .event-card .card-top{
+    gap:15px;
+    padding:15px 15px 13px;
+  }
+  .day-panel .event-card .time-bubble{
+    min-width:66px;
+    min-height:52px;
+  }
+  .day-panel .event-card .time-bubble .t-hour{
+    font-size:17px;
+  }
+  .day-panel .event-card .card-title{
+    font-size:16px;
+  }
+  .day-panel .event-card .badge{
+    font-size:11px;
+  }
+}
+
+@media (max-width:759px){
+  .day-panel-events{gap:9px;}
+  .day-panel .event-card{
+    border-radius:18px;
+  }
+  .day-panel .event-card .time-bubble{
+    min-width:56px;
+    min-height:46px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .day-panel-events>.event-card{
+    animation:none!important;
   }
 }

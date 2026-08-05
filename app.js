@@ -1,5 +1,5 @@
 
-// Agenda Presidencia 6.0 · experiencia ejecutiva móvil y escritorio
+// Agenda Presidencia · experiencia ejecutiva con tarjetas amplias
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -469,19 +469,6 @@ function moveCalendarMonth(delta){
   render();
 }
 
-function renderDayTimeline(events,selected){
-  const today=sameDay(selected,todayAtMidnight());
-  return `<div class="day-timeline" role="list">${events.map((event,index)=>{
-    const temporal=eventTemporalMeta(event);
-    const modality=modalityMeta(event.MODALIDAD);
-    const time=event.HORA?formatTime(event.HORA):(isCalendarAbsenceEvent(event)?'Todo el día':'Sin hora');
-    return `<div class="timeline-item ${modality.className} ${temporal.state?`temporal-${temporal.state}`:''}" role="listitem" style="--timeline-index:${index}">
-      <div class="timeline-axis" aria-hidden="true"><span class="timeline-time">${escapeHTML(time)}</span><i class="timeline-node"></i><b class="timeline-line"></b></div>
-      <div class="timeline-content">${renderCard(event)}</div>
-    </div>`;
-  }).join('')}</div>`;
-}
-
 function renderSelectedDayPanel(){
   const selected=selectedCalDate||new Date();
   const events=selectedDayEvents();
@@ -505,7 +492,7 @@ function renderSelectedDayPanel(){
       <button class="day-step" id="dayNext" type="button" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div class="day-panel-events">
-      ${events.length?renderDayTimeline(events,selected):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
+      ${events.length?events.map(renderCard).join(''):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
     </div>
     <div class="swipe-hint">Deslice horizontalmente para cambiar de día</div>
   </aside>`;
@@ -652,7 +639,7 @@ function bindBriefActions(){
     calendarDate=new Date(selectedCalDate.getFullYear(),selectedCalDate.getMonth(),1);
     setView('calendario');
     render();
-    window.setTimeout(()=>document.querySelector('.timeline-item.temporal-next')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
+    window.setTimeout(()=>document.querySelector('.day-panel-events .event-card.temporal-next')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
   });
 }
 

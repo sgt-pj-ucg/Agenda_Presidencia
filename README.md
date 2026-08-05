@@ -1,58 +1,34 @@
-# Agenda Presidenta 6.0 — experiencia ejecutiva
+# Agenda Presidenta 6.0.1 — tarjetas ejecutivas recuperadas
 
-Esta entrega se construyó sobre la versión 5.0.10 y conserva la integración existente con Google Sheets y Google Apps Script.
+Esta entrega corrige la experiencia de detalle diario de la versión 6.0.
 
-## Mejoras incorporadas
+## Cambio principal
 
-### 1. Tarjeta ejecutiva inteligente
-- Resume la jornada actual.
-- Indica la próxima actividad, hora y modalidad.
-- Advierte coincidencias horarias.
-- Señala actividades pendientes o por confirmar.
-- Identifica ausencias registradas.
-- Al tocar “Próxima”, abre el calendario en el día actual y lleva a la actividad correspondiente.
+Se elimina completamente la línea de tiempo vertical. Las actividades del día vuelven a mostrarse mediante tarjetas completas, con:
 
-### 2. Línea de tiempo diaria
-- El panel del día seleccionado utiliza una línea de tiempo vertical.
-- Orden cronológico único.
-- Marcadores cromáticos por modalidad.
-- La próxima actividad se destaca automáticamente.
-- Las actividades pasadas permanecen visibles, pero atenuadas.
+- hora grande y claramente visible;
+- etiquetas de modalidad amplias;
+- título con mayor legibilidad;
+- lugar, participantes, estado y acciones sin reducción;
+- orden cronológico conservado;
+- próxima actividad destacada;
+- actividades pasadas atenuadas de forma discreta.
 
-### 3. Microinteracciones
-- Transición direccional al cambiar de mes.
-- Respuesta visual al seleccionar un día.
-- Entrada progresiva de la línea de tiempo.
-- Confirmaciones con vibración breve en Android, cuando el dispositivo lo permite.
-- Animaciones respetan “Reducir movimiento”.
+## Mejoras 6.0 que se mantienen
 
-### 4. Hoy y próxima actividad
-- “Hoy” tiene anillo dorado e identificación textual.
-- La próxima actividad muestra “Próxima · en X min”.
-- Las actividades ya realizadas se distinguen sin desaparecer.
+- tarjeta ejecutiva inteligente;
+- indicador de próxima actividad;
+- protagonismo de Hoy;
+- microinteracciones;
+- búsqueda inteligente por voz;
+- diferenciación de modalidades;
+- diseño específico para notebook y PC;
+- instalación PWA;
+- conexión con Google Sheets y Apps Script.
 
-### 5. Búsqueda inteligente por voz
-Ejemplos admitidos:
-- “¿Qué tengo mañana?”
-- “Muéstrame la agenda del viernes.”
-- “Busca actividades telemáticas.”
-- “Actividades presenciales esta semana.”
-- “¿Cuál es mi próxima actividad?”
-- “Abre el calendario del 12 de agosto.”
+## Actualización
 
-La voz solo consulta y navega; no elimina ni modifica actividades.
-
-### 6. Experiencia notebook
-- Navegación lateral ejecutiva.
-- Cabecera y resumen adaptados a pantallas anchas.
-- Calendario y línea de tiempo en dos paneles.
-- Mayor densidad de información sin perder legibilidad.
-- Agenda y vista mensual aprovechan dos columnas.
-- Escala adicional para pantallas de 1440 px o más.
-
-## Publicación
-
-Sube todo el contenido del paquete a la raíz del repositorio:
+Sube todo el contenido de esta carpeta a la raíz del repositorio:
 
 - `index.html`
 - `styles.css`
@@ -63,4 +39,4 @@ Sube todo el contenido del paquete a la raíz del repositorio:
 
 No es necesario modificar `Code.gs`.
 
-Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla. Si Android mantiene una versión anterior, elimina el acceso directo y vuelve a instalarla desde Chrome.
+Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para renovar la caché.
