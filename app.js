@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · experiencia ejecutiva con tarjetas amplias
+// Agenda Presidencia · escritorio dividido, móvil intacto
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 

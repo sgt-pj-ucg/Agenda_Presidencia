@@ -1,34 +1,29 @@
-# Agenda Presidenta 6.0.1 — tarjetas ejecutivas recuperadas
+# Agenda Presidenta 6.0.2 — notebook y PC renovados
 
-Esta entrega corrige la experiencia de detalle diario de la versión 6.0.
+Esta entrega modifica únicamente la experiencia de escritorio. La composición móvil de la versión 6.0.1 se conserva.
 
-## Cambio principal
+## Diseño de calendario para notebook y PC
 
-Se elimina completamente la línea de tiempo vertical. Las actividades del día vuelven a mostrarse mediante tarjetas completas, con:
+- Calendario compacto y proporcionado en el sector izquierdo.
+- Actividades del día seleccionado en un panel amplio a la derecha.
+- Al hacer clic en cualquier fecha, el detalle se actualiza en el panel derecho.
+- Se eliminó el desplazamiento interno del panel de actividades: la lectura sigue el desplazamiento natural de la página.
+- El calendario permanece visible al recorrer una jornada extensa.
+- Días de 48 px, seis semanas estables y leyenda compacta.
+- Horas, títulos, modalidades, lugares y estados mantienen tamaños amplios.
+- Transición breve al cambiar de día, sin animaciones invasivas.
 
-- hora grande y claramente visible;
-- etiquetas de modalidad amplias;
-- título con mayor legibilidad;
-- lugar, participantes, estado y acciones sin reducción;
-- orden cronológico conservado;
-- próxima actividad destacada;
-- actividades pasadas atenuadas de forma discreta.
+## Refinamiento visual de escritorio
 
-## Mejoras 6.0 que se mantienen
+- Navegación lateral más delgada.
+- Cabecera más horizontal y equilibrada.
+- Escudo institucional optimizado para pantallas grandes mediante un isotipo nítido.
+- Sombras más suaves y superficies con mejor jerarquía.
+- Adaptación progresiva para notebook, monitor estándar y pantallas amplias.
 
-- tarjeta ejecutiva inteligente;
-- indicador de próxima actividad;
-- protagonismo de Hoy;
-- microinteracciones;
-- búsqueda inteligente por voz;
-- diferenciación de modalidades;
-- diseño específico para notebook y PC;
-- instalación PWA;
-- conexión con Google Sheets y Apps Script.
+## Archivos que deben subirse
 
-## Actualización
-
-Sube todo el contenido de esta carpeta a la raíz del repositorio:
+Reemplaza todo el contenido del repositorio con:
 
 - `index.html`
 - `styles.css`

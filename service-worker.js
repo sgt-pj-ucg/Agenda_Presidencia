@@ -1,14 +1,15 @@
-const CACHE_NAME = 'agenda-presidenta-shell-601';
+const CACHE_NAME = 'agenda-presidenta-shell-602';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=601',
-  './app.js?v=601',
+  './styles.css?v=602',
+  './app.js?v=602',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './icons/poder-judicial-symbol.png'
 ];
 
 self.addEventListener('install', event => {

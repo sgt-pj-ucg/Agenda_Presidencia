@@ -3570,3 +3570,359 @@ html[data-theme="light"] .cal-cell.today{background:linear-gradient(145deg,#fff2
     animation:none!important;
   }
 }
+
+/* ==========================================================================
+   6.0.2 · experiencia específica para notebook y PC
+   El diseño móvil queda intacto. Calendario compacto a la izquierda y
+   actividades amplias a la derecha.
+   ========================================================================== */
+
+@media (min-width:980px) and (pointer:fine){
+  :root{
+    --desktop-nav-width:82px;
+    --desktop-content-max:1320px;
+    --desktop-calendar-width:430px;
+  }
+
+  body{
+    padding-left:var(--desktop-nav-width);
+    padding-bottom:30px;
+  }
+
+  /* Navegación lateral más ligera y menos dominante. */
+  .bottom-nav{
+    left:10px;
+    width:62px;
+    padding:9px 6px;
+    gap:5px;
+    border-radius:22px;
+    background:color-mix(in srgb,var(--v5-surface) 94%,transparent);
+    box-shadow:0 18px 44px rgba(5,14,31,.18);
+  }
+  .nav-btn{
+    width:50px;
+    min-height:54px;
+    height:54px;
+    border-radius:15px;
+    font-size:8.5px;
+  }
+  .nav-btn .nav-icon{
+    width:36px;
+    height:27px;
+  }
+  .nav-btn.nav-add{
+    width:46px;
+    height:46px;
+    min-height:46px;
+    margin:6px auto;
+    border-width:4px;
+  }
+
+  /* Cabecera horizontal más limpia en pantalla grande. */
+  .app-header{
+    padding:14px 28px 12px;
+  }
+  .header-top,
+  .executive-brief,
+  .header-stats{
+    width:100%;
+    max-width:var(--desktop-content-max);
+    margin-left:auto;
+    margin-right:auto;
+  }
+  .header-top{
+    min-height:48px;
+  }
+  .header-escudo{
+    width:48px;
+    height:48px;
+    border-radius:14px;
+  }
+  .header-escudo img{
+    content:url('icons/poder-judicial-symbol.png');
+    width:35px;
+    height:35px;
+    object-fit:contain;
+    opacity:1;
+  }
+  html[data-theme="dark"] .header-escudo img{
+    filter:none;
+  }
+  html[data-theme="light"] .header-escudo img{
+    filter:brightness(0) saturate(100%) invert(17%) sepia(27%) saturate(1469%) hue-rotate(178deg) brightness(89%) contrast(94%);
+  }
+  .header-text h1{
+    font-size:18px;
+  }
+  .header-text .subtitle{
+    font-size:9.5px;
+  }
+  .executive-brief{
+    grid-template-columns:minmax(330px,.92fr) minmax(430px,1.25fr) 46px;
+    min-height:96px;
+    padding:14px 16px;
+    border-radius:20px;
+  }
+  .brief-title{
+    font-size:20px;
+  }
+  .brief-subtitle{
+    font-size:12px;
+  }
+  .brief-signal{
+    min-height:35px;
+  }
+  .brief-calendar-button{
+    width:43px;
+    height:43px;
+  }
+
+  .tabs-wrapper{
+    padding-left:28px;
+    padding-right:28px;
+  }
+  .tabs-row{
+    max-width:var(--desktop-content-max);
+    margin:0 auto;
+  }
+  .search-bar{
+    padding-left:max(28px,calc((100vw - var(--desktop-nav-width) - var(--desktop-content-max))/2 + 28px));
+    padding-right:max(28px,calc((100vw - var(--desktop-nav-width) - var(--desktop-content-max))/2 + 28px));
+  }
+  .content{
+    width:100%;
+    max-width:var(--desktop-content-max);
+    padding:20px 28px 42px;
+  }
+  body[data-view="calendario"] .content{
+    display:block;
+  }
+  body[data-view="calendario"] .updated-bar{
+    margin-bottom:12px;
+  }
+
+  /* Composición principal: calendario compacto + detalle generoso. */
+  .calendar-workspace{
+    display:grid;
+    grid-template-columns:minmax(380px,var(--desktop-calendar-width)) minmax(0,1fr);
+    gap:24px;
+    align-items:start;
+    width:100%;
+  }
+
+  .calendar-workspace>.calendar-card,
+  .calendar-workspace>.day-panel{
+    grid-column:auto!important;
+    width:100%;
+    margin:0;
+  }
+
+  .calendar-card{
+    position:sticky;
+    top:252px;
+    align-self:start;
+    padding:18px 18px 15px;
+    border-radius:22px;
+    box-shadow:0 18px 46px rgba(8,19,40,.13);
+    overflow:visible;
+  }
+  .cal-header{
+    align-items:center;
+    margin-bottom:12px;
+  }
+  .cal-eyebrow{
+    font-size:8px;
+  }
+  .cal-title{
+    font-size:19px;
+  }
+  .cal-subtitle{
+    font-size:10px;
+  }
+  .cal-today-btn{
+    height:32px;
+    padding:0 10px;
+    border-radius:10px;
+    font-size:10px;
+  }
+  .cal-nav{
+    width:32px;
+    height:32px;
+    border-radius:10px;
+  }
+  .cal-nav svg{
+    width:15px;
+    height:15px;
+  }
+  .cal-days-header{
+    margin-bottom:4px;
+  }
+  .cal-days-header span{
+    font-size:8px;
+  }
+  .cal-grid{
+    gap:5px;
+    grid-template-rows:repeat(6,48px);
+  }
+  .cal-cell{
+    min-height:48px;
+    height:48px;
+    aspect-ratio:auto;
+    border-radius:11px;
+    padding:3px 2px 8px;
+  }
+  .cal-day-number{
+    font-size:13px;
+  }
+  .cal-cell.today::before{
+    top:2px;
+    font-size:5px;
+  }
+  .activity-line{
+    left:6px;
+    right:6px;
+    bottom:5px;
+    height:3px;
+  }
+  .calendar-legend{
+    display:grid;
+    grid-template-columns:repeat(3,max-content);
+    justify-content:start;
+    gap:7px 11px;
+    padding-top:10px;
+    font-size:8px;
+    overflow:visible;
+  }
+
+  /* Panel derecho: sin scroll interno, lectura natural y tarjetas amplias. */
+  .day-panel{
+    position:relative;
+    top:auto;
+    align-self:start;
+    min-height:560px;
+    max-height:none;
+    overflow:visible;
+    padding:0 0 20px;
+    border-radius:22px;
+    box-shadow:0 18px 46px rgba(8,19,40,.13);
+  }
+  .day-panel-handle,
+  .swipe-hint{
+    display:none;
+  }
+  .day-panel-head{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 40px 40px;
+    gap:8px;
+    align-items:center;
+    margin:0;
+    padding:18px 20px 16px;
+    border-bottom:1px solid var(--v5-line);
+    background:linear-gradient(135deg,color-mix(in srgb,var(--v5-brand-soft) 45%,var(--v5-surface)),var(--v5-surface));
+  }
+  .day-panel-copy{
+    order:1;
+    text-align:left;
+  }
+  .day-panel-copy h3{
+    margin:3px 0;
+    font-size:20px;
+    line-height:1.2;
+  }
+  .day-panel-copy p{
+    font-size:11px;
+  }
+  .day-panel-eyebrow{
+    font-size:8.5px;
+  }
+  #dayPrev{
+    order:2;
+  }
+  #dayNext{
+    order:3;
+  }
+  .day-step{
+    width:40px;
+    height:40px;
+    border-radius:12px;
+  }
+  .day-panel-events{
+    gap:12px;
+    padding:18px 20px 0;
+  }
+  .day-panel-events>.event-card{
+    border-radius:18px;
+    box-shadow:0 8px 24px rgba(10,24,48,.06);
+    transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+  }
+  .day-panel-events>.event-card:hover{
+    transform:translateY(-2px);
+    border-color:color-mix(in srgb,var(--v5-brand) 30%,var(--v5-line));
+    box-shadow:0 14px 30px rgba(10,24,48,.10);
+  }
+  .day-panel .event-card .card-top{
+    gap:16px;
+    padding:15px 16px 14px;
+  }
+  .day-panel .event-card .time-bubble{
+    min-width:70px;
+    min-height:54px;
+    border-radius:14px;
+  }
+  .day-panel .event-card .time-bubble .t-hour{
+    font-size:18px;
+  }
+  .day-panel .event-card .card-title{
+    font-size:16px;
+    line-height:1.32;
+  }
+  .day-panel .event-card .badge{
+    font-size:10.5px;
+  }
+  .day-panel .event-card .mode-banner{
+    min-height:36px;
+    padding-left:14px!important;
+    padding-right:12px!important;
+  }
+  .day-panel .event-card .status-row{
+    min-height:50px;
+    padding:8px 14px;
+  }
+  .calendar-empty-day{
+    min-height:430px;
+    margin:18px 20px 0;
+    border-radius:18px;
+  }
+
+  /* Transición ligera al seleccionar otro día. */
+  .day-panel{
+    animation:v602DesktopPanelIn .24s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes v602DesktopPanelIn{
+    from{opacity:.74;transform:translateX(7px);}
+    to{opacity:1;transform:none;}
+  }
+}
+
+@media (min-width:1280px) and (pointer:fine){
+  :root{
+    --desktop-calendar-width:448px;
+  }
+  .calendar-workspace{
+    grid-template-columns:minmax(400px,var(--desktop-calendar-width)) minmax(0,1fr);
+    gap:28px;
+  }
+}
+
+@media (min-width:1540px) and (pointer:fine){
+  :root{
+    --desktop-content-max:1400px;
+    --desktop-calendar-width:462px;
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  @media (min-width:980px) and (pointer:fine){
+    .day-panel{animation:none!important;}
+  }
+}
