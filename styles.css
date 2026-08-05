@@ -1434,3 +1434,226 @@ html[data-theme="light"] .cal-cell.selected{background:#fff0c7;color:#4d3510;}
   body{padding-left:96px;padding-bottom:24px}.bottom-nav{position:fixed;left:14px;top:50%;bottom:auto;right:auto;width:68px;height:auto;transform:translateY(-50%);display:flex;flex-direction:column;padding:10px 7px;gap:7px;border-radius:24px}.nav-btn{height:58px;min-height:58px;font-size:9px}.nav-btn.nav-add{order:3;margin:5px auto;width:50px;height:50px;border-width:4px}.app-header{padding-left:26px}.tabs-wrapper{padding-left:26px}.calendar-workspace{grid-template-columns:minmax(520px,1.08fr) minmax(390px,.92fr);gap:16px}.calendar-card{position:sticky;top:280px}.day-panel{position:sticky;top:280px;max-height:calc(100vh - 300px);overflow:auto}.day-panel-handle,.swipe-hint{display:none}.day-panel-events{max-height:none}.content{max-width:1240px}.event-card{transition:transform .18s ease,border-color .18s ease}.event-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--v5-brand) 28%,var(--v5-line));}
 }
 @media (prefers-reduced-motion:reduce){.activity-line i{animation:none;transform:none}.cal-cell{transition:none}}
+
+/* ================================================================
+   AGENDA PRESIDENCIA 5.0.1 — CONTRASTE DE MODALIDADES Y AUSENCIAS
+   Paletas equivalentes para modo claro/oscuro y señalización calendar.
+   ================================================================ */
+:root{
+  --mod-presencial:#38d3a5;
+  --mod-presencial-strong:#12a47e;
+  --mod-presencial-soft:rgba(56,211,165,.115);
+  --mod-presencial-border:rgba(56,211,165,.42);
+
+  --mod-telematica:#65a6ff;
+  --mod-telematica-strong:#3e7ee8;
+  --mod-telematica-soft:rgba(101,166,255,.12);
+  --mod-telematica-border:rgba(101,166,255,.44);
+
+  --mod-hibrida-a:#b48aff;
+  --mod-hibrida-b:#47c2df;
+  --mod-hibrida-soft:rgba(180,138,255,.11);
+  --mod-hibrida-border:rgba(180,138,255,.46);
+
+  --absence-card-soft:rgba(113,134,168,.14);
+  --absence-cell-bg:rgba(113,134,168,.18);
+  --absence-cell-border:rgba(151,171,205,.68);
+  --absence-cell-text:#eef4ff;
+  --absence-cell-shadow:rgba(55,74,105,.22);
+}
+
+html[data-theme="light"]{
+  --mod-presencial:#087f68;
+  --mod-presencial-strong:#066653;
+  --mod-presencial-soft:#e7f7f2;
+  --mod-presencial-border:#90d5c3;
+
+  --mod-telematica:#245fbd;
+  --mod-telematica-strong:#194d9d;
+  --mod-telematica-soft:#eaf2ff;
+  --mod-telematica-border:#9ebce9;
+
+  --mod-hibrida-a:#7649c7;
+  --mod-hibrida-b:#087f9b;
+  --mod-hibrida-soft:#f1ecff;
+  --mod-hibrida-border:#bca9e8;
+
+  --absence-card-soft:#eef2f7;
+  --absence-cell-bg:#e8edf5;
+  --absence-cell-border:#8799b5;
+  --absence-cell-text:#304866;
+  --absence-cell-shadow:rgba(74,94,125,.12);
+}
+
+/* Las modalidades se reconocen incluso antes de leer la etiqueta. */
+.event-card.presencial,
+.event-card.telematica,
+.event-card.hibrida,
+.event-card.special{
+  position:relative;
+  isolation:isolate;
+}
+.event-card.presencial{
+  border-left-color:var(--mod-presencial);
+  background:linear-gradient(90deg,var(--mod-presencial-soft),transparent 34%),var(--v5-card);
+}
+.event-card.telematica{
+  border-left-color:var(--mod-telematica);
+  background:linear-gradient(90deg,var(--mod-telematica-soft),transparent 34%),var(--v5-card);
+}
+.event-card.hibrida{
+  border-left-color:transparent;
+  background:linear-gradient(90deg,var(--mod-hibrida-soft),transparent 38%),var(--v5-card);
+}
+.event-card.hibrida::after{
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:4px;
+  z-index:2;
+  background:linear-gradient(180deg,var(--mod-hibrida-a),var(--mod-hibrida-b));
+}
+.event-card.special{
+  border-left-color:var(--v5-absence);
+  background:linear-gradient(90deg,var(--absence-card-soft),transparent 42%),var(--v5-card);
+}
+
+/* Bandas de modalidad: claras, sobrias y consistentes entre temas. */
+.mode-banner{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:6px 11px!important;
+  font-size:9px!important;
+  font-weight:850;
+  letter-spacing:.105em!important;
+  border-bottom-width:1px!important;
+}
+.mode-banner .mode-icon{
+  width:22px;
+  height:22px;
+  display:grid;
+  place-items:center;
+  flex:0 0 22px;
+  border-radius:8px;
+  font-size:12px;
+  background:color-mix(in srgb,currentColor 13%,transparent);
+  border:1px solid color-mix(in srgb,currentColor 25%,transparent);
+}
+.mode-presencial{
+  color:var(--mod-presencial)!important;
+  background:var(--mod-presencial-soft)!important;
+  border-bottom-color:var(--mod-presencial-border)!important;
+}
+.mode-telematica{
+  color:var(--mod-telematica)!important;
+  background:var(--mod-telematica-soft)!important;
+  border-bottom-color:var(--mod-telematica-border)!important;
+}
+.mode-hibrida{
+  color:var(--mod-hibrida-a)!important;
+  background:linear-gradient(90deg,var(--mod-hibrida-soft),color-mix(in srgb,var(--mod-hibrida-b) 9%,transparent))!important;
+  border-bottom-color:var(--mod-hibrida-border)!important;
+}
+.mode-hibrida .mode-icon{
+  color:var(--mod-hibrida-a);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mod-hibrida-a) 18%,transparent),color-mix(in srgb,var(--mod-hibrida-b) 17%,transparent));
+  border-color:color-mix(in srgb,var(--mod-hibrida-a) 30%,transparent);
+}
+.mode-special{
+  color:var(--v5-absence)!important;
+  background:var(--absence-card-soft)!important;
+  border-bottom-color:color-mix(in srgb,var(--v5-absence) 42%,transparent)!important;
+}
+
+/* Badges y hora heredan la identidad de cada modalidad. */
+.b-presencial{
+  color:var(--mod-presencial)!important;
+  background:var(--mod-presencial-soft)!important;
+  border-color:var(--mod-presencial-border)!important;
+}
+.b-telematica{
+  color:var(--mod-telematica)!important;
+  background:var(--mod-telematica-soft)!important;
+  border-color:var(--mod-telematica-border)!important;
+}
+.b-hibrida{
+  color:var(--mod-hibrida-a)!important;
+  background:linear-gradient(135deg,var(--mod-hibrida-soft),color-mix(in srgb,var(--mod-hibrida-b) 10%,transparent))!important;
+  border-color:var(--mod-hibrida-border)!important;
+}
+.event-card.presencial .time-bubble{border-color:var(--mod-presencial-border);}
+.event-card.presencial .time-bubble .t-hour{color:var(--mod-presencial);}
+.event-card.telematica .time-bubble{border-color:var(--mod-telematica-border);}
+.event-card.telematica .time-bubble .t-hour{color:var(--mod-telematica);}
+.event-card.hibrida .time-bubble{border-color:var(--mod-hibrida-border);}
+.event-card.hibrida .time-bubble .t-hour{color:var(--mod-hibrida-a);}
+
+/* Ausencias: el cajón completo se distingue, no solo la línea inferior. */
+.cal-cell.has-absence:not(.selected){
+  color:var(--absence-cell-text);
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--v5-absence) 17%,transparent),transparent 64%),
+    var(--absence-cell-bg);
+  border-color:var(--absence-cell-border);
+  box-shadow:
+    inset 3px 0 0 var(--v5-absence),
+    0 5px 13px var(--absence-cell-shadow);
+}
+.cal-cell.has-absence::before{
+  content:"";
+  position:absolute;
+  top:5px;
+  left:8px;
+  right:8px;
+  height:2px;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--v5-absence),color-mix(in srgb,var(--v5-absence) 35%,transparent));
+  opacity:.9;
+}
+.cal-cell.has-absence .cal-day-number{font-weight:850;}
+.cal-cell.has-absence.selected{
+  color:var(--v5-text);
+  background:
+    linear-gradient(135deg,var(--v5-brand-soft),transparent 62%),
+    var(--absence-cell-bg);
+  border-color:var(--v5-brand);
+  box-shadow:
+    inset 3px 0 0 var(--v5-absence),
+    0 0 0 2px color-mix(in srgb,var(--v5-brand) 20%,transparent),
+    0 6px 15px var(--absence-cell-shadow);
+}
+html[data-theme="light"] .cal-cell.has-absence.selected{
+  color:#3d3423;
+  background:linear-gradient(135deg,#fff1c9 0 54%,#e8edf5 100%);
+}
+.cal-cell.has-absence.selected::before{
+  background:var(--v5-absence);
+}
+.cal-cell.has-absence .activity-line .absence{
+  min-width:46%;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--v5-absence) 24%,transparent);
+}
+
+/* La leyenda reproduce el aspecto real del cajón de ausencia. */
+.legend-absence-cell{
+  width:13px;
+  height:13px;
+  display:inline-block;
+  border-radius:4px;
+  background:var(--absence-cell-bg);
+  border:1px solid var(--absence-cell-border);
+  box-shadow:inset 3px 0 0 var(--v5-absence);
+}
+
+/* Interacciones: no degradar contraste al pasar entre temas. */
+@media (hover:hover){
+  .event-card.presencial:hover{border-color:var(--mod-presencial-border);}
+  .event-card.telematica:hover{border-color:var(--mod-telematica-border);}
+  .event-card.hibrida:hover{border-color:var(--mod-hibrida-border);}
+  .cal-cell.has-absence:not(.selected):hover{
+    border-color:var(--v5-absence);
+    filter:brightness(1.04);
+  }
+}

@@ -414,7 +414,7 @@ function renderCalendar() {
         <span><i class="legend-selected"></i>Seleccionado</span>
         <span><i class="legend-line confirmed"></i>Confirmada</span>
         <span><i class="legend-line confirm"></i>Por confirmar</span>
-        <span><i class="legend-line absence"></i>Ausencia</span>
+        <span><i class="legend-absence-cell"></i>Ausencia</span>
       </div>
     </div>
     ${selectedPanel}
