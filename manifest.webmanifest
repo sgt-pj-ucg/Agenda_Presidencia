@@ -1,7 +1,7 @@
 {
   "name": "Agenda Presidenta Gloria Negroni",
   "short_name": "Agenda Presidenta",
-  "description": "Agenda ejecutiva de la Presidencia de la Corte de Apelaciones de La Serena",
+  "description": "Agenda ejecutiva móvil y de escritorio de la Presidencia de la Corte de Apelaciones de La Serena",
   "lang": "es-CL",
   "start_url": "./",
   "scope": "./",

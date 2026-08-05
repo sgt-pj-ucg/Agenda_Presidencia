@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-product="agenda-presidencia-5">
+<html lang="es" data-product="agenda-presidencia-6">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=510" />
+  <link rel="stylesheet" href="styles.css?v=600" />
 </head>
 <body>
 
@@ -69,6 +69,7 @@
         <span class="brief-kicker" id="briefKicker">Resumen ejecutivo</span>
         <strong class="brief-title" id="briefTitle">Preparando la agenda de hoy…</strong>
         <span class="brief-subtitle" id="briefSubtitle">La información se actualizará desde Google Sheets.</span>
+    <div class="brief-signals" id="briefSignals" aria-label="Alertas y datos relevantes del día"></div>
       </div>
       <button class="brief-calendar-button" id="briefCalendarButton" type="button" aria-label="Abrir calendario">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/></svg>
@@ -84,10 +85,10 @@
 <div class="search-bar">
 <div class="search-wrap">
 <span class="s-icon">🔍</span>
-<input autocomplete="off" id="searchInput" placeholder="Buscar actividad, fecha, lugar…" type="text"/>
+<input autocomplete="off" id="searchInput" placeholder="Buscar o decir: ¿qué tengo mañana?" type="text"/>
 <button id="clearSearch">✕</button>
 </div>
-<button class="voice-btn" id="voiceBtn">
+<button class="voice-btn" id="voiceBtn" type="button" aria-label="Buscar por voz" title="Buscar por voz">
 <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
 <rect height="12" rx="3" width="6" x="9" y="2"></rect>
 <path d="M5 10a7 7 0 0 0 14 0"></path>
@@ -305,6 +306,6 @@
 <div class="toast" id="toast"></div>
 
 
-<script src="app.js?v=510" defer></script>
+<script src="app.js?v=600" defer></script>
 </body>
 </html>

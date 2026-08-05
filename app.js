@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · bienvenida premium con tiempo de lectura
+// Agenda Presidencia 6.0 · experiencia ejecutiva móvil y escritorio
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -14,6 +14,7 @@ let editingEvent = null;
 let pendingDeleteEvent = null;
 let refreshTimer = null;
 let lastSuccessfulLoadAt = 0;
+let calendarMotion = '';
 
 const CATEGORIES = [
   { id:'reuniones', label:'Reuniones', icon:'🤝', keywords:['reunión','reunion','reuniones'] },
@@ -189,6 +190,57 @@ function compareEventsChronologically(a,b) {
   return String(a.ACTIVIDAD||'').localeCompare(String(b.ACTIVIDAD||''),'es',{sensitivity:'base'});
 }
 
+function todayAtMidnight(){
+  const date=new Date(); date.setHours(0,0,0,0); return date;
+}
+
+function minutesNow(){
+  const now=new Date(); return now.getHours()*60+now.getMinutes();
+}
+
+function activeEventsForDate(date){
+  return allEvents
+    .filter(event=>sameDay(parseDate(event.FECHA),date)&&getStatus(event)!=='Cancelada')
+    .slice().sort(compareEventsChronologically);
+}
+
+function nextTimedEventForToday(){
+  const nowMinutes=minutesNow();
+  return activeEventsForDate(todayAtMidnight())
+    .find(event=>{
+      const value=timeToMin(event.HORA);
+      return value!==null&&value>=nowMinutes;
+    })||null;
+}
+
+function eventTemporalMeta(event){
+  const eventDate=parseDate(event.FECHA);
+  if(!eventDate||!sameDay(eventDate,todayAtMidnight())||getStatus(event)==='Cancelada') return {state:'',label:'',minutes:null};
+  const value=timeToMin(event.HORA);
+  if(value===null) return {state:'',label:'',minutes:null};
+  const now=minutesNow();
+  const next=nextTimedEventForToday();
+  if(next&&eventKey(next)===eventKey(event)){
+    const difference=Math.max(0,value-now);
+    return {state:'next',label:difference===0?'Ahora':difference<60?`En ${difference} min`:`En ${Math.floor(difference/60)} h ${difference%60?`${difference%60} min`:''}`.trim(),minutes:difference};
+  }
+  if(value<now) return {state:'past',label:'Finalizada',minutes:value-now};
+  return {state:'future',label:'',minutes:value-now};
+}
+
+function sameTimeConflicts(events){
+  const counts=new Map();
+  events.forEach(event=>{
+    const time=normalizeTimeValue(event.HORA);
+    if(time) counts.set(time,(counts.get(time)||0)+1);
+  });
+  return [...counts.entries()].filter(([,count])=>count>1).map(([time,count])=>({time,count}));
+}
+
+function haptic(pattern=18){
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(_){ }
+}
+
 function modalityMeta(value) {
   const modality=normalizeModality(value);
   if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:'●',label:'Presencial'};
@@ -264,31 +316,57 @@ function updateHeaderStats() {
 function updateExecutiveBrief(today,todayEvents) {
   const hour=new Date().getHours();
   const greeting=hour<12?'Buenos días':hour<20?'Buenas tardes':'Buenas noches';
-  const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada');
-  const timed=active.filter(event=>timeToMin(event.HORA)!==null).slice().sort(compareEventsChronologically);
+  const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada').slice().sort(compareEventsChronologically);
+  const timed=active.filter(event=>timeToMin(event.HORA)!==null);
   const absences=active.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event));
-  document.getElementById('briefKicker').textContent=today.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  const next=nextTimedEventForToday();
+  const conflicts=sameTimeConflicts(active);
+  const pending=active.filter(event=>['Por Confirmar','Pendiente'].includes(getStatus(event))).length;
+  const kicker=today.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+
+  document.getElementById('briefKicker').textContent=kicker.charAt(0).toUpperCase()+kicker.slice(1);
   document.getElementById('briefTitle').textContent=`${greeting}, Presidenta.`;
+
   let subtitle='No hay actividades registradas para hoy.';
-  if(active.length){
+  if(active.length===absences.length&&absences.length){
+    subtitle='La jornada está registrada como ausencia, permiso, curso o feriado legal.';
+  }else if(active.length){
     const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
-    const range=timed.length?` Primera a las ${formatTime(timed[0].HORA)}${timed.length>1?` y última a las ${formatTime(timed[timed.length-1].HORA)}`:''}.`:'.';
-    subtitle=`Hoy tiene ${count}.${range}`;
+    if(next){
+      subtitle=`Hoy tiene ${count}. La próxima comienza a las ${formatTime(next.HORA)} y es ${normalizeModality(next.MODALIDAD).toLowerCase()}.`;
+    }else if(timed.length){
+      subtitle=`Hoy tuvo ${count}. Las actividades con hora programada ya finalizaron.`;
+    }else{
+      subtitle=`Hoy tiene ${count}, sin hora definida.`;
+    }
   }
-  if(absences.length && active.length===absences.length) subtitle='La jornada está registrada como ausencia, permiso, curso o feriado legal.';
   document.getElementById('briefSubtitle').textContent=subtitle;
+
+  const signals=[];
+  if(next){
+    const temporal=eventTemporalMeta(next);
+    signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><strong>Próxima</strong><span>${formatTime(next.HORA)} · ${escapeHTML(next.ACTIVIDAD)}</span><em>${temporal.label}</em></button>`);
+  }
+  if(conflicts.length) signals.push(`<span class="brief-signal warning"><strong>Atención</strong><span>${conflicts.length===1?'Coincidencia horaria':'Coincidencias horarias'}</span></span>`);
+  if(pending) signals.push(`<span class="brief-signal pending"><strong>${pending}</strong><span>${pending===1?'actividad por revisar':'actividades por revisar'}</span></span>`);
+  if(absences.length) signals.push(`<span class="brief-signal absence"><strong>${absences.length}</strong><span>${absences.length===1?'ausencia registrada':'ausencias registradas'}</span></span>`);
+  document.getElementById('briefSignals').innerHTML=signals.join('');
 }
 
 function renderCard(event) {
   const status=getStatus(event);
   const modality=modalityMeta(event.MODALIDAD);
   const special=isSpecialActivity(event);
+  const temporal=eventTemporalMeta(event);
   const key=escapeHTML(eventKey(event));
+  const temporalBadge=temporal.state==='next'
+    ? `<span class="temporal-badge next"><span></span>Próxima · ${escapeHTML(temporal.label)}</span>`
+    : temporal.state==='past'?`<span class="temporal-badge past">Finalizada</span>`:'';
   const banner=special
-    ? `<div class="mode-banner mode-special">AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</div>`
-    : `<div class="mode-banner mode-${modality.className}"><span class="mode-icon">${modality.icon}</span> ${modality.label}</div>`;
+    ? `<div class="mode-banner mode-special"><span>AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</span>${temporalBadge}</div>`
+    : `<div class="mode-banner mode-${modality.className}"><span class="mode-copy"><span class="mode-icon">${modality.icon}</span> ${modality.label}</span>${temporalBadge}</div>`;
   return `
-    <article class="event-card ${modality.className} ${special?'special':''} ${status==='Cancelada'?'cancelada':''}" data-key="${key}" data-row="${event._row||''}">
+    <article class="event-card ${modality.className} ${special?'special':''} ${status==='Cancelada'?'cancelada':''} ${temporal.state?`temporal-${temporal.state}`:''}" data-key="${key}" data-row="${event._row||''}">
       ${banner}
       <div class="card-top">
         <div class="time-bubble ${event.HORA?'':'no-time'}"><div class="t-hour">${event.HORA?escapeHTML(formatTime(event.HORA)):'S/H'}</div></div>
@@ -384,10 +462,24 @@ function moveSelectedDay(delta){
 }
 
 function moveCalendarMonth(delta){
+  calendarMotion=delta>0?'next':'prev';
   const nextMonth=new Date(calendarDate.getFullYear(),calendarDate.getMonth()+delta,1);
   calendarDate=nextMonth;
   selectedCalDate=new Date(nextMonth);
   render();
+}
+
+function renderDayTimeline(events,selected){
+  const today=sameDay(selected,todayAtMidnight());
+  return `<div class="day-timeline" role="list">${events.map((event,index)=>{
+    const temporal=eventTemporalMeta(event);
+    const modality=modalityMeta(event.MODALIDAD);
+    const time=event.HORA?formatTime(event.HORA):(isCalendarAbsenceEvent(event)?'Todo el día':'Sin hora');
+    return `<div class="timeline-item ${modality.className} ${temporal.state?`temporal-${temporal.state}`:''}" role="listitem" style="--timeline-index:${index}">
+      <div class="timeline-axis" aria-hidden="true"><span class="timeline-time">${escapeHTML(time)}</span><i class="timeline-node"></i><b class="timeline-line"></b></div>
+      <div class="timeline-content">${renderCard(event)}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function renderSelectedDayPanel(){
@@ -400,6 +492,7 @@ function renderSelectedDayPanel(){
     : 'Sin actividades registradas';
   const activeEvents=events.filter(event=>getStatus(event)!=='Cancelada');
   const first=activeEvents.find(event=>event.HORA);
+  const next=isToday?nextTimedEventForToday():null;
   return `<aside class="day-panel" id="dayPanel" aria-label="Detalle del día seleccionado">
     <div class="day-panel-handle" aria-hidden="true"></div>
     <div class="day-panel-head">
@@ -407,12 +500,12 @@ function renderSelectedDayPanel(){
       <div class="day-panel-copy">
         <span class="day-panel-eyebrow">${isToday?'Hoy':'Día seleccionado'}</span>
         <h3>${label.charAt(0).toUpperCase()+label.slice(1)}</h3>
-        <p>${summary}${first?` · Primera a las ${formatTime(first.HORA)}`:''}</p>
+        <p>${summary}${next?` · Próxima a las ${formatTime(next.HORA)}`:first?` · Primera a las ${formatTime(first.HORA)}`:''}</p>
       </div>
       <button class="day-step" id="dayNext" type="button" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div class="day-panel-events">
-      ${events.length?events.map(renderCard).join(''):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
+      ${events.length?renderDayTimeline(events,selected):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
     </div>
     <div class="swipe-hint">Deslice horizontalmente para cambiar de día</div>
   </aside>`;
@@ -460,7 +553,7 @@ function renderCalendar() {
     return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${hasAbsence?'has-absence':''}" data-date="${key}" type="button" aria-label="${key}${dayEvents.length?`, ${dayEvents.length} actividades, ${labels}`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${line}</button>`;
   }).join('');
   const selectedPanel=renderSelectedDayPanel();
-  return `<section class="calendar-workspace">
+  return `<section class="calendar-workspace ${calendarMotion?`calendar-motion-${calendarMotion}`:''}">
     <div class="calendar-card">
       <div class="cal-header">
         <div class="cal-heading">
@@ -550,6 +643,19 @@ function bindCalendarInteractions(){
   }
 }
 
+
+function bindBriefActions(){
+  document.querySelector('[data-brief-action="next"]')?.addEventListener('click',()=>{
+    const next=nextTimedEventForToday();
+    if(!next) return;
+    selectedCalDate=todayAtMidnight();
+    calendarDate=new Date(selectedCalDate.getFullYear(),selectedCalDate.getMonth(),1);
+    setView('calendario');
+    render();
+    window.setTimeout(()=>document.querySelector('.timeline-item.temporal-next')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
+  });
+}
+
 function render() {
   const content=document.getElementById('content');
   const timestamp=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
@@ -559,7 +665,11 @@ function render() {
   else html+=renderGroups(filterEvents(currentTab));
   content.innerHTML=html;
   bindCardActions();
-  if(currentView==='calendario') bindCalendarInteractions();
+  if(currentView==='calendario') {
+    bindCalendarInteractions();
+    if(calendarMotion) window.setTimeout(()=>{calendarMotion='';},360);
+  }
+  bindBriefActions();
 }
 
 function findEventByKey(key) { return allEvents.find(event=>eventKey(event)===key); }
@@ -593,7 +703,7 @@ function openStatusDropdown(pill,event) {
       await sendScriptAction('estado',{fila:event._row,fecha:event.FECHA,hora:event.HORA,actividad:event.ACTIVIDAD,estado:newStatus});
       event.ESTADO=newStatus;
       updateHeaderStats(); buildTabs(); render();
-      showToast(`✓ Estado actualizado: ${newStatus}`);
+      haptic(18); showToast(`✓ Estado actualizado: ${newStatus}`);
       scheduleRefresh();
     } catch (error) {
       showToast(`⚠️ ${error.message||'No fue posible sincronizar el estado'}`);
@@ -822,7 +932,7 @@ document.getElementById('btnGuardar').addEventListener('click',async()=>{
         lugar:data.LUGAR,participantes:data.PARTICIPANTES,estado:data.ESTADO
       });
       Object.assign(editingEvent,data);
-      showToast('✓ Actividad actualizada');
+      haptic([18,35,18]); showToast('✓ Actividad actualizada');
     } else {
       const result=await sendScriptAction('nueva',{
         fecha:data.FECHA,dia:data['DÍA'],hora:data.HORA,modalidad:data.MODALIDAD,actividad:data.ACTIVIDAD,
@@ -830,7 +940,7 @@ document.getElementById('btnGuardar').addEventListener('click',async()=>{
       });
       const tempRow=Math.max(1,...allEvents.map(e=>Number(e._row)||1))+1;
       allEvents.push({...data,_row:Number(result.row)||tempRow});
-      showToast('✓ Actividad creada');
+      haptic([18,35,18]); showToast('✓ Actividad creada');
     }
     closeActivityModal(); updateHeaderStats(); buildTabs(); render(); scheduleRefresh();
   } catch (error) {
@@ -862,7 +972,7 @@ document.getElementById('btnConfirmDelete').addEventListener('click',async()=>{
   try {
     await sendScriptAction('eliminar',{fila:item._row,fecha:item.FECHA,hora:item.HORA,actividad:item.ACTIVIDAD});
     allEvents=allEvents.filter(event=>event!==item);
-    closeDeleteModal(); updateHeaderStats(); buildTabs(); render(); showToast('✓ Actividad eliminada'); scheduleRefresh();
+    closeDeleteModal(); updateHeaderStats(); buildTabs(); render(); haptic(28); showToast('✓ Actividad eliminada'); scheduleRefresh();
   } catch (error) { message.textContent=`⚠️ ${error.message||'No fue posible eliminar la actividad.'}`; }
   finally { button.disabled=false; button.textContent='Sí, eliminar actividad'; }
 });
@@ -907,44 +1017,99 @@ function scheduleRefresh() {
 
 const MESES={enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11};
 const NUMEROS={uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciséis:16,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,'veintidós':22,veintidos:22,'veintitrés':23,veintitres:23,veinticuatro:24,veinticinco:25,'veintiséis':26,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,'treinta y uno':31};
+const WEEKDAYS={domingo:0,lunes:1,martes:2,miércoles:3,miercoles:3,jueves:4,viernes:5,sábado:6,sabado:6};
+
+function nextWeekdayDate(dayIndex){
+  const today=todayAtMidnight();
+  let delta=(dayIndex-today.getDay()+7)%7;
+  if(delta===0) delta=7;
+  const date=new Date(today); date.setDate(today.getDate()+delta); return date;
+}
 
 function parseSpanishQuery(query) {
   const lower=query.toLowerCase().trim(); let targetDate=null;
+  const today=todayAtMidnight();
+  if(/\bpasado mañana\b/.test(lower)){ targetDate=new Date(today); targetDate.setDate(today.getDate()+2); }
+  else if(/\bmañana\b/.test(lower)){ targetDate=new Date(today); targetDate.setDate(today.getDate()+1); }
+  else if(/\bhoy\b/.test(lower)){ targetDate=today; }
   for (const [word,number] of Object.entries(NUMEROS)) {
     for (const [monthName,monthNumber] of Object.entries(MESES)) {
       if (lower.includes(`${word} de ${monthName}`)||lower.includes(`${word} ${monthName}`)) { targetDate=new Date(new Date().getFullYear(),monthNumber,number); break; }
     }
     if (targetDate) break;
   }
-  if (!targetDate) { const match=lower.match(/(\d{1,2})\s*(?:de\s+)?(\w+)/); if(match&&MESES[match[2]]!==undefined)targetDate=new Date(new Date().getFullYear(),MESES[match[2]],Number(match[1])); }
+  if (!targetDate) { const match=lower.match(/(\d{1,2})\s*(?:de\s+)?([a-záéíóúñ]+)/); if(match&&MESES[match[2]]!==undefined)targetDate=new Date(new Date().getFullYear(),MESES[match[2]],Number(match[1])); }
   if (!targetDate) { const match=lower.match(/(\d{1,2})[\/-](\d{1,2})/); if(match)targetDate=new Date(new Date().getFullYear(),Number(match[2])-1,Number(match[1])); }
+  if (!targetDate) {
+    const weekday=Object.keys(WEEKDAYS).find(name=>new RegExp(`\\b${name}\\b`).test(lower));
+    if(weekday) targetDate=nextWeekdayDate(WEEKDAYS[weekday]);
+  }
   return {targetDate,rawQuery:lower};
 }
 
 function searchEvents(query) {
   if (!query.trim()) return null;
   const {targetDate,rawQuery}=parseSpanishQuery(query);
-  if (targetDate) return allEvents.filter(e=>sameDay(parseDate(e.FECHA),targetDate));
-  const getText=e=>[e.ACTIVIDAD,e.LUGAR,e.PARTICIPANTES,normalizeModality(e.MODALIDAD),getStatus(e)].join(' ').toLowerCase();
-  const words=rawQuery.split(' ').filter(word=>word.length>2);
-  let results=allEvents.filter(e=>getText(e).includes(rawQuery));
-  if (results.length) return results;
-  results=allEvents.filter(e=>{const text=getText(e);return words.length>0&&words.every(word=>text.includes(word));});
-  if (results.length) return results;
-  return allEvents.filter(e=>{const text=getText(e);return words.some(word=>text.includes(word));});
+  let base=[...allEvents];
+  if (/\b(esta semana|semana)\b/.test(rawQuery)&&!targetDate) base=filterEvents('semana');
+  else if (targetDate) base=base.filter(event=>sameDay(parseDate(event.FECHA),targetDate));
+
+  const modality=rawQuery.includes('telem')||rawQuery.includes('virtual')?'Telemática':rawQuery.includes('híbr')||rawQuery.includes('hibr')?'Híbrida':rawQuery.includes('presencial')?'Presencial':null;
+  if(modality) base=base.filter(event=>normalizeModality(event.MODALIDAD)===modality);
+
+  const status=rawQuery.includes('por confirmar')?'Por Confirmar':rawQuery.includes('pendiente')?'Pendiente':rawQuery.includes('ausente')||rawQuery.includes('permiso')?'Ausente':rawQuery.includes('cancelad')?'Cancelada':rawQuery.includes('confirmad')?'Confirmada':null;
+  if(status) base=base.filter(event=>status==='Ausente'?isCalendarAbsenceEvent(event):getStatus(event)===status);
+
+  const commandWords=['muéstrame','muestrame','mostrar','muestra','qué','que','tengo','agenda','actividad','actividades','para','del','de','el','la','las','los','esta','este','buscar','busca','ver'];
+  const words=rawQuery.split(/\s+/).map(word=>word.replace(/[^a-záéíóúñ0-9]/g,'')).filter(word=>word.length>2&&!commandWords.includes(word)&&!Object.keys(WEEKDAYS).includes(word)&&!Object.keys(MESES).includes(word)&&!['mañana','hoy','semana','presencial','presenciales','telemática','telematicas','telemáticas','híbrida','hibrida','híbridas','hibridas','confirmada','confirmadas','pendiente','pendientes','ausente','cancelada'].includes(word));
+  if(targetDate||modality||status||/\b(esta semana|semana)\b/.test(rawQuery)){
+    if(!words.length) return base.slice().sort((a,b)=>parseDate(a.FECHA)-parseDate(b.FECHA)||compareEventsChronologically(a,b));
+  }
+  const getText=event=>[event.ACTIVIDAD,event.LUGAR,event.PARTICIPANTES,normalizeModality(event.MODALIDAD),getStatus(event)].join(' ').toLowerCase();
+  if(!words.length) return base.slice().sort((a,b)=>parseDate(a.FECHA)-parseDate(b.FECHA)||compareEventsChronologically(a,b));
+  let results=base.filter(event=>words.every(word=>getText(event).includes(word)));
+  if(results.length) return results;
+  return base.filter(event=>words.some(word=>getText(event).includes(word)));
 }
 
 const searchInput=document.getElementById('searchInput');
+function showSearchResults(query,results,voice=false){
+  const info=document.getElementById('searchInfo');
+  info.style.display='block';
+  info.textContent=results.length?`${voice?'Orden comprendida · ':''}${results.length} resultado${results.length!==1?'s':''} para “${query}”`:`Sin resultados para “${query}”`;
+  document.getElementById('content').innerHTML=results.length?renderGroups(results):`<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
+  bindCardActions();
+}
+
 function handleSearch(query) {
   document.getElementById('clearSearch').style.display=query?'block':'none';
   const info=document.getElementById('searchInfo');
   if (!query.trim()) { info.style.display='none'; render(); return; }
-  const results=searchEvents(query);
-  info.style.display='block';
-  info.textContent=results.length?`${results.length} resultado${results.length!==1?'s':''} para “${query}”`:`Sin resultados para “${query}”`;
-  document.getElementById('content').innerHTML=results.length?renderGroups(results):`<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
-  bindCardActions();
+  showSearchResults(query,searchEvents(query)||[],false);
 }
+
+function executeVoiceCommand(text){
+  const normalized=text.toLowerCase().trim();
+  if(/\b(calendario|mes)\b/.test(normalized)&&!/(actividad|tengo|buscar|busca)/.test(normalized)){
+    const parsed=parseSpanishQuery(normalized);
+    if(parsed.targetDate){ selectedCalDate=parsed.targetDate; calendarDate=new Date(parsed.targetDate.getFullYear(),parsed.targetDate.getMonth(),1); }
+    setView('calendario'); render(); showToast('Calendario abierto'); return;
+  }
+  if(/\b(próxima actividad|proxima actividad|qué sigue|que sigue)\b/.test(normalized)){
+    const next=nextTimedEventForToday();
+    if(next){
+      setView('buscar'); searchInput.value=text; showSearchResults(text,[next],true); showToast(`Próxima: ${formatTime(next.HORA)}`);
+    }else showToast('No quedan actividades con hora para hoy');
+    return;
+  }
+  setView('buscar');
+  searchInput.value=text;
+  document.getElementById('clearSearch').style.display='block';
+  const results=searchEvents(text)||[];
+  showSearchResults(text,results,true);
+  haptic(12);
+}
+
 searchInput.addEventListener('input',event=>handleSearch(event.target.value));
 document.getElementById('clearSearch').addEventListener('click',()=>{searchInput.value='';handleSearch('');searchInput.focus();});
 
@@ -997,8 +1162,8 @@ else {
   recognition.onstart=()=>voiceBtn.classList.add('listening');
   recognition.onend=()=>voiceBtn.classList.remove('listening');
   recognition.onerror=()=>{voiceBtn.classList.remove('listening');showToast('No se pudo escuchar');};
-  recognition.onresult=event=>{const text=event.results[0][0].transcript;searchInput.value=text;handleSearch(text);};
-  voiceBtn.addEventListener('click',()=>{if(voiceBtn.classList.contains('listening'))recognition.stop();else{recognition.start();showToast('🎙️ Escuchando…');}});
+  recognition.onresult=event=>{const text=event.results[0][0].transcript.trim();executeVoiceCommand(text);};
+  voiceBtn.addEventListener('click',()=>{if(voiceBtn.classList.contains('listening'))recognition.stop();else{recognition.start();showToast('🎙️ Diga: ¿qué tengo mañana?');}});
 }
 
 function showToast(message) {
@@ -1148,7 +1313,8 @@ async function loadData({silent=false}={}) {
       allEvents=[
         {FECHA:key(0),'DÍA':'Hoy',HORA:'09:00',MODALIDAD:'Presencial',ACTIVIDAD:'Reunión de coordinación de Presidencia',LUGAR:'Sala de reuniones',PARTICIPANTES:'Equipo de Presidencia',ESTADO:'Confirmada',_row:2},
         {FECHA:key(0),'DÍA':'Hoy',HORA:'12:30',MODALIDAD:'Híbrida',ACTIVIDAD:'Pleno extraordinario',LUGAR:'Salón de Pleno',PARTICIPANTES:'Ministras y ministros',ESTADO:'Por Confirmar',_row:3},
-        {FECHA:key(1),'DÍA':'Mañana',HORA:'10:00',MODALIDAD:'Telemática',ACTIVIDAD:'Audiencia protocolar',LUGAR:'Enlace institucional',PARTICIPANTES:'Autoridades regionales',ESTADO:'Pendiente',_row:4},
+        {FECHA:key(0),'DÍA':'Hoy',HORA:'16:00',MODALIDAD:'Telemática',ACTIVIDAD:'Reunión con administración zonal',LUGAR:'Enlace institucional',PARTICIPANTES:'Administración',ESTADO:'Confirmada',_row:4},
+        {FECHA:key(1),'DÍA':'Mañana',HORA:'10:00',MODALIDAD:'Telemática',ACTIVIDAD:'Audiencia protocolar',LUGAR:'Enlace institucional',PARTICIPANTES:'Autoridades regionales',ESTADO:'Pendiente',_row:5},
         {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Feriado legal de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:5},
         {FECHA:key(4),'DÍA':'',HORA:'15:30',MODALIDAD:'Presencial',ACTIVIDAD:'Ceremonia de juramento',LUGAR:'Tercera Sala',PARTICIPANTES:'Invitados',ESTADO:'Confirmada',_row:6}
       ];
