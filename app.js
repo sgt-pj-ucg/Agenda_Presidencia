@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · interfaz premium móvil; conserva el backend operativo
+// Agenda Presidencia · interfaz móvil con encabezado adaptativo
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -553,6 +553,9 @@ function bindCardActions() {
 function setView(view) {
   currentView=view;
   document.body.dataset.view=view;
+  document.body.classList.remove('header-collapsed');
+  adaptiveHeaderLastY=window.scrollY;
+  adaptiveHeaderDirectionAnchor=window.scrollY;
   document.querySelectorAll('.nav-btn:not(.nav-add)').forEach(button=>button.classList.remove('active'));
   const map={agenda:'navAgenda',calendario:'navCalendar',buscar:'navSearch',mes:'navMes'};
   document.getElementById(map[view])?.classList.add('active');
@@ -562,6 +565,14 @@ function setView(view) {
   else searchBar.style.display='';
   searchInfo.style.display='none';
   searchInput.value='';
+  if (view==='calendario') {
+    requestAnimationFrame(() => {
+      window.scrollTo({top:0,behavior:'smooth'});
+      updateAdaptiveHeader({forceExpanded:true});
+    });
+  } else {
+    updateAdaptiveHeader({forceExpanded:true});
+  }
 }
 
 document.getElementById('navAgenda').addEventListener('click',()=>{currentTab='hoy';setView('agenda');buildTabs();render();});
@@ -791,6 +802,67 @@ document.addEventListener('keydown',event=>{
   if(deleteModal.classList.contains('open')) closeDeleteModal();
 });
 
+
+
+
+// Encabezado adaptativo móvil: se repliega al bajar en Calendario y reaparece al subir.
+let adaptiveHeaderLastY = window.scrollY;
+let adaptiveHeaderFrame = 0;
+let adaptiveHeaderDirectionAnchor = window.scrollY;
+
+function expandAdaptiveHeader() {
+  document.body.classList.remove('header-collapsed');
+}
+
+function updateAdaptiveHeader({forceExpanded=false}={}) {
+  const mobile = window.matchMedia('(max-width: 759px)').matches;
+  const calendarView = currentView === 'calendario';
+  const y = Math.max(0, window.scrollY);
+
+  if (forceExpanded || !mobile || !calendarView) {
+    expandAdaptiveHeader();
+    adaptiveHeaderLastY = y;
+    adaptiveHeaderDirectionAnchor = y;
+    return;
+  }
+
+  if (y <= 18) {
+    expandAdaptiveHeader();
+    adaptiveHeaderDirectionAnchor = y;
+  } else {
+    const delta = y - adaptiveHeaderLastY;
+
+    if (delta > 0 && y - adaptiveHeaderDirectionAnchor > 22 && y > 54) {
+      document.body.classList.add('header-collapsed');
+      adaptiveHeaderDirectionAnchor = y;
+    } else if (delta < 0 && adaptiveHeaderDirectionAnchor - y > 14) {
+      expandAdaptiveHeader();
+      adaptiveHeaderDirectionAnchor = y;
+    }
+  }
+
+  adaptiveHeaderLastY = y;
+}
+
+window.addEventListener('scroll', () => {
+  if (adaptiveHeaderFrame) return;
+  adaptiveHeaderFrame = requestAnimationFrame(() => {
+    adaptiveHeaderFrame = 0;
+    updateAdaptiveHeader();
+  });
+}, {passive:true});
+
+window.addEventListener('resize', () => updateAdaptiveHeader({forceExpanded:true}));
+
+document.getElementById('appHeader')?.addEventListener('click', event => {
+  if (
+    currentView === 'calendario' &&
+    document.body.classList.contains('header-collapsed') &&
+    !event.target.closest('button')
+  ) {
+    expandAdaptiveHeader();
+  }
+});
 
 
 const themeToggle = document.getElementById('themeToggle');

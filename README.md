@@ -1,35 +1,33 @@
-# Agenda Presidenta — entrega móvil premium e instalable
+# Agenda Presidenta — encabezado adaptativo y calendario protagonista
 
-Esta carpeta es independiente de la versión operativa anterior.
+Proyecto de prueba independiente de la versión estable.
 
-## Cambios principales
+## Cambios de esta entrega
 
-- Cabecera móvil más baja.
-- Nombre “Presidenta Gloria Negroni” en una sola línea.
-- Sin número de versión visible.
-- Escudo legible en tema claro y oscuro.
-- Micrófono con contraste reforzado.
-- Deslizamiento horizontal del calendario para cambiar de mes.
-- Ausencias reconocibles con borde fino, sin bisel grueso.
-- Aplicación instalable (PWA), con íconos y apertura a pantalla completa.
+- Identidad superior recuperada: escudo, Agenda y Presidenta Gloria Negroni vuelven a tener presencia.
+- Saludo y resumen ejecutivo más legibles.
+- En Calendario, el encabezado se repliega al desplazarse hacia abajo.
+- Al desplazarse hacia arriba o volver al inicio, el encabezado reaparece.
+- El encabezado compacto conserva el nombre, el tema y el botón de actualización.
+- Calendario más grande: días de 44 px, título mensual mayor y más aire visual.
+- Se mantienen:
+  - deslizamiento horizontal para cambiar de mes;
+  - deslizamiento del panel para cambiar de día;
+  - identificación fina de ausencias;
+  - instalación PWA;
+  - conexión operativa con Google Sheets.
 
-## Archivos que deben subirse a GitHub
+## Archivos que deben reemplazarse
 
-Sube todos estos archivos y carpetas a la raíz del repositorio:
+Sube todo el contenido de esta carpeta a la raíz del repositorio de prueba:
 
 - `index.html`
 - `styles.css`
 - `app.js`
-- `manifest.webmanifest`
 - `service-worker.js`
+- `manifest.webmanifest`
 - carpeta `icons/`
 
 No es necesario modificar `Code.gs`.
 
-## Instalación en el teléfono
-
-### Android / Chrome
-Abre la aplicación publicada, entra al menú de Chrome y elige **Instalar aplicación** o **Agregar a pantalla principal**.
-
-### iPhone / Safari
-Abre la aplicación, toca **Compartir** y elige **Agregar a inicio**.
+Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para que el service worker cargue la nueva interfaz.
