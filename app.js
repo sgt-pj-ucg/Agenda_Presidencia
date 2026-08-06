@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · escritorio dividido, móvil intacto
+// Agenda Presidencia · legibilidad móvil y compatibilidad de voz en iPhone
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -333,7 +333,7 @@ function updateExecutiveBrief(today,todayEvents) {
   }else if(active.length){
     const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
     if(next){
-      subtitle=`Hoy tiene ${count}. La próxima comienza a las ${formatTime(next.HORA)} y es ${normalizeModality(next.MODALIDAD).toLowerCase()}.`;
+      subtitle=`Hoy tiene ${count}. La próxima actividad comienza a las ${formatTime(next.HORA)}.`;
     }else if(timed.length){
       subtitle=`Hoy tuvo ${count}. Las actividades con hora programada ya finalizaron.`;
     }else{
@@ -345,7 +345,7 @@ function updateExecutiveBrief(today,todayEvents) {
   const signals=[];
   if(next){
     const temporal=eventTemporalMeta(next);
-    signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><strong>Próxima</strong><span>${formatTime(next.HORA)} · ${escapeHTML(next.ACTIVIDAD)}</span><em>${temporal.label}</em></button>`);
+    signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><span class="brief-signal-copy"><strong>Próxima actividad</strong><span class="brief-signal-detail"><b>${formatTime(next.HORA)}</b><span>${escapeHTML(next.ACTIVIDAD)}</span></span></span><em>${temporal.label}</em></button>`);
   }
   if(conflicts.length) signals.push(`<span class="brief-signal warning"><strong>Atención</strong><span>${conflicts.length===1?'Coincidencia horaria':'Coincidencias horarias'}</span></span>`);
   if(pending) signals.push(`<span class="brief-signal pending"><strong>${pending}</strong><span>${pending===1?'actividad por revisar':'actividades por revisar'}</span></span>`);
@@ -360,7 +360,7 @@ function renderCard(event) {
   const temporal=eventTemporalMeta(event);
   const key=escapeHTML(eventKey(event));
   const temporalBadge=temporal.state==='next'
-    ? `<span class="temporal-badge next"><span></span>Próxima · ${escapeHTML(temporal.label)}</span>`
+    ? `<span class="temporal-badge next"><span class="temporal-dot"></span><strong>Próxima</strong><em>${escapeHTML(temporal.label)}</em></span>`
     : temporal.state==='past'?`<span class="temporal-badge past">Finalizada</span>`:'';
   const banner=special
     ? `<div class="mode-banner mode-special"><span>AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</span>${temporalBadge}</div>`
@@ -795,7 +795,7 @@ function closeActivityModal() {
   activityModal.classList.remove('open');
   timePickerModal.classList.remove('open');
   editingEvent=null;
-  if(activityDictationRecognition&&activityVoiceBtn.classList.contains('listening')) activityDictationRecognition.stop();
+  if(activityDictationRecognition?.isActive?.()) activityDictationRecognition.stop();
 }
 
 document.getElementById('navAdd').addEventListener('click',()=>openActivityModal('add'));
@@ -841,12 +841,18 @@ function openTimePicker(){
   }else{
     timePickerTotalMinutes=defaultPickerTime();
   }
+  document.activeElement?.blur?.();
   syncTimePickerFields();
   timePickerModal.classList.add('open');
-  setTimeout(()=>timePickerHour.focus(),220);
+  requestAnimationFrame(()=>{
+    const modal=timePickerModal.querySelector('.time-picker-modal');
+    if(modal) modal.scrollTop=0;
+  });
 }
 
 function closeTimePicker(){
+  timePickerHour.blur();
+  timePickerMinute.blur();
   timePickerModal.classList.remove('open');
 }
 
@@ -867,6 +873,9 @@ document.getElementById('timePlus15').addEventListener('click',()=>{
 });
 timePickerHour.addEventListener('change',readTimePickerFields);
 timePickerMinute.addEventListener('change',readTimePickerFields);
+[timePickerHour,timePickerMinute].forEach(input=>input.addEventListener('focus',()=>{
+  window.setTimeout(()=>input.scrollIntoView({block:'center',behavior:'smooth'}),180);
+}));
 
 document.querySelectorAll('[data-picker-time]').forEach(button=>button.addEventListener('click',()=>{
   const [hour,minute]=button.dataset.pickerTime.split(':').map(Number);
@@ -1034,6 +1043,19 @@ function parseSpanishQuery(query) {
   return {targetDate,rawQuery:lower};
 }
 
+function hasExplicitDateExpression(query){
+  const lower=String(query||'').toLowerCase();
+  const monthNames=Object.keys(MESES).join('|');
+  const numberWords=Object.keys(NUMEROS).sort((a,b)=>b.length-a.length).map(word=>word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+  return new RegExp(`(?:\\b\\d{1,2}\\s*(?:de\\s+)?(?:${monthNames})\\b)|(?:\\b(?:${numberWords})\\s+(?:de\\s+)?(?:${monthNames})\\b)|(?:\\b\\d{1,2}[/-]\\d{1,2}\\b)`).test(lower);
+}
+
+function formatVoiceDate(date){
+  if(!(date instanceof Date)||Number.isNaN(date.getTime())) return '';
+  const text=date.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
+  return text.charAt(0).toUpperCase()+text.slice(1);
+}
+
 function searchEvents(query) {
   if (!query.trim()) return null;
   const {targetDate,rawQuery}=parseSpanishQuery(query);
@@ -1062,9 +1084,21 @@ function searchEvents(query) {
 const searchInput=document.getElementById('searchInput');
 function showSearchResults(query,results,voice=false){
   const info=document.getElementById('searchInfo');
+  const parsed=parseSpanishQuery(query);
+  const exactDateEmpty=!results.length&&parsed.targetDate&&hasExplicitDateExpression(query);
+  const dateLabel=exactDateEmpty?formatVoiceDate(parsed.targetDate):'';
   info.style.display='block';
-  info.textContent=results.length?`${voice?'Orden comprendida · ':''}${results.length} resultado${results.length!==1?'s':''} para “${query}”`:`Sin resultados para “${query}”`;
-  document.getElementById('content').innerHTML=results.length?renderGroups(results):`<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
+  info.classList.toggle('voice-date-feedback',exactDateEmpty);
+  info.textContent=results.length
+    ? `${voice?'Orden comprendida · ':''}${results.length} resultado${results.length!==1?'s':''} para “${query}”`
+    : exactDateEmpty
+      ? `Sin actividad agendada para ${dateLabel}.`
+      : `Sin resultados para “${query}”`;
+  document.getElementById('content').innerHTML=results.length
+    ? renderGroups(results)
+    : exactDateEmpty
+      ? `<div class="empty empty-date"><div class="icon">✓</div><p><strong>Sin actividad agendada</strong><br>${escapeHTML(dateLabel)}</p></div>`
+      : `<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
   bindCardActions();
 }
 
@@ -1077,6 +1111,27 @@ function handleSearch(query) {
 
 function executeVoiceCommand(text){
   const normalized=text.toLowerCase().trim();
+  const parsedCommand=parseSpanishQuery(normalized);
+  if(parsedCommand.targetDate&&hasExplicitDateExpression(normalized)&&/\b(actividad|actividades|agenda|tengo|hay|programad|qué|que)\b/.test(normalized)){
+    const dateEvents=allEvents.filter(event=>sameDay(parseDate(event.FECHA),parsedCommand.targetDate)).sort(compareEventsChronologically);
+    selectedCalDate=new Date(parsedCommand.targetDate);
+    calendarDate=new Date(parsedCommand.targetDate.getFullYear(),parsedCommand.targetDate.getMonth(),1);
+    setView('calendario');
+    render();
+    const dateLabel=formatVoiceDate(parsedCommand.targetDate);
+    const info=document.getElementById('searchInfo');
+    info.style.display='block';
+    info.classList.add('voice-date-feedback');
+    if(dateEvents.length){
+      info.textContent=`${dateEvents.length} ${dateEvents.length===1?'actividad agendada':'actividades agendadas'} para ${dateLabel}.`;
+      showToast(`${dateEvents.length} ${dateEvents.length===1?'actividad':'actividades'} · ${dateLabel}`);
+    }else{
+      info.textContent=`Sin actividad agendada para ${dateLabel}.`;
+      showToast('Sin actividad agendada');
+    }
+    haptic(12);
+    return;
+  }
   if(/\b(calendario|mes)\b/.test(normalized)&&!/(actividad|tengo|buscar|busca)/.test(normalized)){
     const parsed=parseSpanishQuery(normalized);
     if(parsed.targetDate){ selectedCalDate=parsed.targetDate; calendarDate=new Date(parsed.targetDate.getFullYear(),parsed.targetDate.getMonth(),1); }
@@ -1103,55 +1158,189 @@ document.getElementById('clearSearch').addEventListener('click',()=>{searchInput
 
 const activityVoiceBtn=document.getElementById('activityVoiceBtn');
 const activityVoiceHint=document.getElementById('activityVoiceHint');
-const ActivitySpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-let activityDictationRecognition=null;
+const voiceBtn=document.getElementById('voiceBtn');
+const SpeechRecognitionAPI=window.SpeechRecognition||window.webkitSpeechRecognition;
+const speechUA=navigator.userAgent||'';
+const speechIsIOS=/iPad|iPhone|iPod/.test(speechUA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const speechIsIOSAlternative=speechIsIOS&&/(CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo)/.test(speechUA);
+const speechIsStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
-if(!ActivitySpeechRecognition){
+function speechErrorMessage(code=''){
+  const messages={
+    'not-allowed':'Permiso de voz bloqueado. En iPhone, revise el micrófono y que Siri esté activada.',
+    'service-not-allowed':'La voz no está disponible aquí. En iPhone, use Safari o la aplicación instalada y active Siri.',
+    'audio-capture':'No fue posible acceder al micrófono.',
+    'no-speech':'No se detectó voz. Toque el micrófono e intente nuevamente.',
+    'network':'El reconocimiento de voz necesita conexión en este dispositivo.',
+    'language-not-supported':'El reconocimiento no admite español en este dispositivo.'
+  };
+  return messages[code]||'No fue posible reconocer la voz. Intente nuevamente.';
+}
+
+function createSpeechController({button,onPending,onListening,onTranscript,onError,onIdle}){
+  let recognition=null;
+  let state='idle';
+  let startTimer=0;
+  let listenTimer=0;
+  let finalized=true;
+  let manualStop=false;
+  let gotResult=false;
+
+  const clearTimers=()=>{
+    window.clearTimeout(startTimer);
+    window.clearTimeout(listenTimer);
+    startTimer=0;
+    listenTimer=0;
+  };
+
+  const setVisualState=next=>{
+    state=next;
+    button.classList.toggle('starting',next==='starting');
+    button.classList.toggle('listening',next==='listening');
+    button.setAttribute('aria-busy',next==='idle'?'false':'true');
+  };
+
+  const finalize=(reason='end')=>{
+    if(finalized) return;
+    finalized=true;
+    clearTimers();
+    recognition=null;
+    setVisualState('idle');
+    onIdle?.(reason,gotResult);
+  };
+
+  const stop=()=>{
+    if(state==='idle') return;
+    manualStop=true;
+    const current=recognition;
+    try{ current?.abort(); }catch(_){ }
+    finalize('cancel');
+  };
+
+  const start=()=>{
+    if(!SpeechRecognitionAPI){
+      onError?.('El reconocimiento de voz no está disponible en este navegador.');
+      return;
+    }
+    if(speechIsIOSAlternative&&!speechIsStandalone){
+      onError?.('En iPhone, abra la agenda desde Safari o desde el ícono instalado para usar la voz.');
+      return;
+    }
+    if(state!=='idle'){
+      stop();
+      return;
+    }
+
+    manualStop=false;
+    gotResult=false;
+    finalized=false;
+    recognition=new SpeechRecognitionAPI();
+    const current=recognition;
+    current.lang='es-CL';
+    current.continuous=false;
+    current.interimResults=false;
+    current.maxAlternatives=1;
+    setVisualState('starting');
+    onPending?.();
+
+    current.onstart=()=>{
+      if(finalized) return;
+      window.clearTimeout(startTimer);
+      setVisualState('listening');
+      onListening?.();
+      listenTimer=window.setTimeout(()=>{
+        if(finalized) return;
+        try{ current.stop(); }catch(_){ finalize('timeout'); }
+      },9000);
+    };
+
+    current.onresult=event=>{
+      if(finalized) return;
+      const transcript=event.results?.[0]?.[0]?.transcript?.trim()||'';
+      if(transcript){
+        gotResult=true;
+        onTranscript?.(transcript);
+      }
+      try{ current.stop(); }catch(_){ finalize('result'); }
+    };
+
+    current.onerror=event=>{
+      if(finalized) return;
+      const code=event.error||'';
+      if(!(manualStop&&code==='aborted')) onError?.(speechErrorMessage(code));
+      finalize(code||'error');
+    };
+
+    current.onend=()=>{
+      if(finalized) return;
+      if(!manualStop&&!gotResult) onError?.('No se detectó una instrucción. Toque el micrófono e intente nuevamente.');
+      finalize(gotResult?'result':'end');
+    };
+
+    try{
+      current.start();
+      startTimer=window.setTimeout(()=>{
+        if(finalized||state!=='starting') return;
+        onError?.(speechIsIOS
+          ? 'El micrófono no respondió. Verifique Siri y el permiso de micrófono; luego intente nuevamente.'
+          : 'El micrófono no respondió. Intente nuevamente.');
+        try{ current.abort(); }catch(_){ }
+        finalize('start-timeout');
+      },2800);
+    }catch(error){
+      onError?.('No fue posible iniciar el micrófono. Espere un momento e intente nuevamente.');
+      finalize('start-error');
+    }
+  };
+
+  return {start,stop,isActive:()=>state!=='idle'};
+}
+
+let activityDictationRecognition=null;
+let searchSpeechController=null;
+
+if(!SpeechRecognitionAPI){
   activityVoiceBtn.disabled=true;
   activityVoiceBtn.classList.add('unavailable');
   activityVoiceHint.textContent='El dictado no está disponible en este navegador; puede escribir normalmente.';
+  voiceBtn.disabled=true;
+  voiceBtn.classList.add('unavailable');
+  voiceBtn.title='Voz no disponible en este navegador';
 }else{
-  activityDictationRecognition=new ActivitySpeechRecognition();
-  activityDictationRecognition.lang='es-CL';
-  activityDictationRecognition.continuous=false;
-  activityDictationRecognition.interimResults=false;
-  activityDictationRecognition.onstart=()=>{
-    activityVoiceBtn.classList.add('listening');
-    activityVoiceHint.textContent='Escuchando… hable con naturalidad.';
-  };
-  activityDictationRecognition.onend=()=>{
-    activityVoiceBtn.classList.remove('listening');
-    if(activityVoiceHint.textContent.startsWith('Escuchando')) activityVoiceHint.textContent='Puede escribir o usar el micrófono.';
-  };
-  activityDictationRecognition.onerror=()=>{
-    activityVoiceBtn.classList.remove('listening');
-    activityVoiceHint.textContent='No fue posible escuchar. Puede intentarlo nuevamente o escribir.';
-  };
-  activityDictationRecognition.onresult=event=>{
-    const transcript=event.results[0][0].transcript.trim();
-    const field=document.getElementById('fActividad');
-    field.value=[field.value.trim(),transcript].filter(Boolean).join(' ');
-    field.focus();
-    field.setSelectionRange(field.value.length,field.value.length);
-    activityVoiceHint.textContent='Dictado incorporado. Puede corregirlo antes de guardar.';
-  };
-  activityVoiceBtn.addEventListener('click',()=>{
-    if(activityVoiceBtn.classList.contains('listening')) activityDictationRecognition.stop();
-    else activityDictationRecognition.start();
+  activityDictationRecognition=createSpeechController({
+    button:activityVoiceBtn,
+    onPending:()=>{activityVoiceHint.textContent='Preparando micrófono…';},
+    onListening:()=>{activityVoiceHint.textContent='Escuchando… hable con naturalidad.';},
+    onTranscript:transcript=>{
+      const field=document.getElementById('fActividad');
+      field.value=[field.value.trim(),transcript].filter(Boolean).join(' ');
+      field.focus();
+      field.setSelectionRange(field.value.length,field.value.length);
+      activityVoiceHint.textContent='Dictado incorporado. Puede corregirlo antes de guardar.';
+    },
+    onError:message=>{activityVoiceHint.textContent=message;},
+    onIdle:(reason,gotResult)=>{
+      if(!gotResult&&['cancel'].includes(reason)) activityVoiceHint.textContent='Puede escribir o usar el micrófono.';
+    }
   });
+
+  searchSpeechController=createSpeechController({
+    button:voiceBtn,
+    onPending:()=>showToast('Preparando micrófono…'),
+    onListening:()=>showToast('🎙️ Escuchando: diga una fecha o actividad'),
+    onTranscript:text=>executeVoiceCommand(text),
+    onError:message=>showToast(message)
+  });
+
+  activityVoiceBtn.addEventListener('click',()=>activityDictationRecognition.start());
+  voiceBtn.addEventListener('click',()=>searchSpeechController.start());
 }
 
-const voiceBtn=document.getElementById('voiceBtn');
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-if (!SpeechRecognition) voiceBtn.style.opacity='.35';
-else {
-  const recognition=new SpeechRecognition(); recognition.lang='es-CL'; recognition.continuous=false; recognition.interimResults=false;
-  recognition.onstart=()=>voiceBtn.classList.add('listening');
-  recognition.onend=()=>voiceBtn.classList.remove('listening');
-  recognition.onerror=()=>{voiceBtn.classList.remove('listening');showToast('No se pudo escuchar');};
-  recognition.onresult=event=>{const text=event.results[0][0].transcript.trim();executeVoiceCommand(text);};
-  voiceBtn.addEventListener('click',()=>{if(voiceBtn.classList.contains('listening'))recognition.stop();else{recognition.start();showToast('🎙️ Diga: ¿qué tengo mañana?');}});
-}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='hidden') return;
+  activityDictationRecognition?.stop?.();
+  searchSpeechController?.stop?.();
+});
 
 function showToast(message) {
   const toast=document.getElementById('toast'); toast.textContent=message; toast.classList.add('show');

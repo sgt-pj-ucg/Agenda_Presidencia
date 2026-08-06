@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=602" />
+  <link rel="stylesheet" href="styles.css?v=603" />
 </head>
 <body>
 
@@ -97,7 +97,7 @@
 </svg>
 </button>
 </div>
-<div class="search-info" id="searchInfo"></div>
+<div aria-live="polite" class="search-info" id="searchInfo"></div>
 <!-- CONTENT -->
 <div class="content" id="content">
 <div class="loading"><div class="spinner"></div>Cargando agenda…</div>
@@ -259,16 +259,17 @@
 <div class="time-number-fields">
 <label>
 <span>Hora</span>
-<input id="timePickerHour" inputmode="numeric" max="23" min="0" pattern="[0-9]*" type="number"/>
+<input autocomplete="off" enterkeyhint="next" id="timePickerHour" inputmode="numeric" max="23" min="0" pattern="[0-9]*" type="number"/>
 </label>
 <strong>:</strong>
 <label>
 <span>Minutos</span>
-<input id="timePickerMinute" inputmode="numeric" max="59" min="0" pattern="[0-9]*" step="5" type="number"/>
+<input autocomplete="off" enterkeyhint="done" id="timePickerMinute" inputmode="numeric" max="59" min="0" pattern="[0-9]*" step="5" type="number"/>
 </label>
 </div>
 <button aria-label="Sumar quince minutos" class="time-adjust-button" id="timePlus15" type="button">+15</button>
 </div>
+<p class="time-picker-hint">Use −15, +15 o una hora frecuente. También puede tocar Hora o Minutos para escribir.</p>
 <div class="time-picker-presets" aria-label="Horas frecuentes">
 <button data-picker-time="08:00" type="button">08:00</button>
 <button data-picker-time="08:30" type="button">08:30</button>
@@ -306,6 +307,6 @@
 <div class="toast" id="toast"></div>
 
 
-<script src="app.js?v=602" defer></script>
+<script src="app.js?v=603" defer></script>
 </body>
 </html>

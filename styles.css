@@ -3926,3 +3926,201 @@ html[data-theme="light"] .cal-cell.today{background:linear-gradient(145deg,#fff2
     .day-panel{animation:none!important;}
   }
 }
+
+/* ========================================================================== 
+   6.0.3 · legibilidad móvil, hora superior y voz estable en iPhone
+   ========================================================================== */
+
+.brief-signal-copy{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.brief-signal-detail{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.brief-signal-detail b{
+  flex:none;
+  color:var(--v5-text);
+  font-size:10px;
+  font-weight:900;
+}
+.brief-signal-detail>span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.temporal-badge.next{
+  min-height:25px;
+  padding:5px 9px;
+  gap:5px;
+  font-size:9px;
+  line-height:1;
+  font-weight:900;
+  white-space:nowrap;
+  color:#2b210b;
+  background:linear-gradient(135deg,#f9e9b4,#dfbd65);
+  border-color:#edce7a;
+}
+.temporal-badge.next strong,
+.temporal-badge.next em{
+  font:inherit;
+  font-style:normal;
+}
+.temporal-badge.next em{font-weight:820;}
+.temporal-badge.next .temporal-dot{
+  width:6px;
+  height:6px;
+  flex:0 0 6px;
+  border-radius:50%;
+  background:#58420d;
+  animation:v6NextPulse 1.7s ease-in-out infinite;
+}
+
+.time-picker-hint{
+  margin:-4px 0 12px;
+  color:var(--v5-muted);
+  font-size:10px;
+  line-height:1.4;
+  text-align:center;
+}
+
+.voice-btn.starting,
+.field-mic-button.starting{
+  opacity:.78;
+  cursor:progress;
+  animation:v603VoiceStarting .8s ease-in-out infinite alternate;
+}
+.voice-btn.unavailable{opacity:.38;cursor:not-allowed;}
+@keyframes v603VoiceStarting{to{transform:scale(.96);}}
+
+.search-info.voice-date-feedback{
+  color:var(--v5-text);
+  background:color-mix(in srgb,var(--v5-brand) 11%,var(--v5-surface));
+  border:1px solid color-mix(in srgb,var(--v5-brand) 34%,var(--v5-line));
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:750;
+}
+.empty.empty-date .icon{
+  color:var(--v5-brand);
+  border-color:color-mix(in srgb,var(--v5-brand) 35%,var(--v5-line));
+}
+
+@media(max-width:759px){
+  /* Resumen sin texto cortado y ficha de próxima actividad más ordenada. */
+  .executive-brief{
+    min-height:72px;
+    max-height:none;
+    padding:10px 10px 10px 13px;
+  }
+  .brief-copy{min-width:0;overflow:visible;}
+  .brief-subtitle{
+    max-width:none!important;
+    white-space:normal!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    font-size:10.5px!important;
+    line-height:1.28!important;
+  }
+  .brief-signals{
+    width:100%;
+    margin-top:8px;
+    padding:0;
+    overflow:visible;
+  }
+  .brief-signal.next{
+    width:100%;
+    max-width:none;
+    min-height:45px;
+    display:grid;
+    grid-template-columns:8px minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+    padding:7px 10px;
+    border-radius:13px;
+  }
+  .brief-signal-copy strong{
+    font-size:9.5px;
+    line-height:1.1;
+  }
+  .brief-signal-detail b{font-size:12px;}
+  .brief-signal-detail>span{
+    max-width:none!important;
+    font-size:9.5px;
+  }
+  .brief-signal.next em{
+    font-size:9.5px;
+    line-height:1.1;
+    text-align:right;
+  }
+  .signal-dot{width:7px;height:7px;flex-basis:7px;}
+
+  /* La etiqueta de próxima actividad se lee sin esfuerzo. */
+  .mode-banner{min-height:39px;}
+  .temporal-badge.next{
+    min-height:27px;
+    padding:6px 9px;
+    font-size:9.5px!important;
+    letter-spacing:0;
+  }
+
+  /* Selector de hora como lámina superior, por encima del teclado. */
+  .time-picker-overlay{
+    align-items:flex-start!important;
+    justify-content:center;
+    padding:max(8px,env(safe-area-inset-top)) 8px 0!important;
+  }
+  .time-picker-overlay .time-picker-modal{
+    width:100%;
+    max-width:520px;
+    max-height:calc(100dvh - max(16px,env(safe-area-inset-top)));
+    padding:14px 14px max(18px,env(safe-area-inset-bottom));
+    border:1px solid var(--v5-line)!important;
+    border-radius:22px!important;
+    transform:translateY(calc(-100% - 24px))!important;
+    box-shadow:0 20px 60px rgba(2,10,25,.42);
+    overscroll-behavior:contain;
+  }
+  .time-picker-overlay.open .time-picker-modal{
+    transform:translateY(0)!important;
+  }
+  .time-picker-overlay .modal-handle{display:none;}
+  .time-picker-display{margin-top:4px;}
+  .time-picker-hint{font-size:9.5px;margin-bottom:10px;}
+  .time-number-fields input{font-size:25px;}
+
+  .search-info.voice-date-feedback{
+    margin:7px 12px 3px;
+    font-size:10px;
+    line-height:1.35;
+  }
+}
+
+@media(max-width:380px){
+  .brief-signal.next{
+    grid-template-columns:7px minmax(0,1fr);
+  }
+  .brief-signal.next em{
+    grid-column:2;
+    text-align:left;
+  }
+  .temporal-badge.next{
+    padding-left:7px;
+    padding-right:7px;
+    font-size:9px!important;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  .voice-btn.starting,.field-mic-button.starting{animation:none!important;}
+}

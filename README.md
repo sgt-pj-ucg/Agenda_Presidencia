@@ -1,37 +1,26 @@
-# Agenda Presidenta 6.0.2 — notebook y PC renovados
+# Agenda Presidenta 6.0.3 — legibilidad móvil y compatibilidad iPhone
 
-Esta entrega modifica únicamente la experiencia de escritorio. La composición móvil de la versión 6.0.1 se conserva.
+## Cambios visibles
 
-## Diseño de calendario para notebook y PC
+- La tarjeta superior ya no corta la frase de próxima actividad.
+- El resumen evita repetir modalidad y detalle innecesariamente.
+- La ficha “Próxima actividad” ocupa el ancho disponible, con hora y cuenta regresiva más legibles.
+- La etiqueta amarilla dentro de la actividad aumenta tamaño, contraste y área visual.
+- El selector de hora se abre en la parte superior del teléfono.
+- El teclado ya no se abre automáticamente al seleccionar hora.
+- Las horas frecuentes y los botones ±15 siguen disponibles.
+- Las consultas de voz por una fecha vacía muestran “Sin actividad agendada”.
 
-- Calendario compacto y proporcionado en el sector izquierdo.
-- Actividades del día seleccionado en un panel amplio a la derecha.
-- Al hacer clic en cualquier fecha, el detalle se actualiza en el panel derecho.
-- Se eliminó el desplazamiento interno del panel de actividades: la lectura sigue el desplazamiento natural de la página.
-- El calendario permanece visible al recorrer una jornada extensa.
-- Días de 48 px, seis semanas estables y leyenda compacta.
-- Horas, títulos, modalidades, lugares y estados mantienen tamaños amplios.
-- Transición breve al cambiar de día, sin animaciones invasivas.
+## Voz en iPhone
 
-## Refinamiento visual de escritorio
+- Cada intento crea una sesión nueva de reconocimiento, lo que evita bloqueos por reutilización.
+- Se agrega un límite de inicio de 2,8 segundos y un máximo de escucha de 9 segundos.
+- El botón siempre vuelve a su estado normal ante error, silencio, cambio de aplicación o pérdida de visibilidad.
+- Los mensajes distinguen permiso bloqueado, falta de voz, red y micrófono.
+- En iPhone se recomienda Safari o la aplicación instalada desde Safari, con Siri y micrófono habilitados.
 
-- Navegación lateral más delgada.
-- Cabecera más horizontal y equilibrada.
-- Escudo institucional optimizado para pantallas grandes mediante un isotipo nítido.
-- Sombras más suaves y superficies con mejor jerarquía.
-- Adaptación progresiva para notebook, monitor estándar y pantallas amplias.
+## Actualización
 
-## Archivos que deben subirse
-
-Reemplaza todo el contenido del repositorio con:
-
-- `index.html`
-- `styles.css`
-- `app.js`
-- `service-worker.js`
-- `manifest.webmanifest`
-- carpeta `icons/`
-
-No es necesario modificar `Code.gs`.
+Sube todo el contenido de esta carpeta a la raíz del repositorio. No es necesario modificar `Code.gs`.
 
 Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para renovar la caché.
