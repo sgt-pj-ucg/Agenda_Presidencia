@@ -4124,3 +4124,249 @@ html[data-theme="light"] .cal-cell.today{background:linear-gradient(145deg,#fff2
 @media(prefers-reduced-motion:reduce){
   .voice-btn.starting,.field-mic-button.starting{animation:none!important;}
 }
+
+/* ==========================================================================
+   6.0.4 · Feriados nacionales de Chile
+   ========================================================================== */
+
+:root{
+  --holiday-accent:#a45158;
+  --holiday-accent-strong:#813a41;
+  --holiday-border:#c78489;
+  --holiday-surface:#3a2028;
+  --holiday-text:#ffdadd;
+}
+html[data-theme="light"]{
+  --holiday-accent:#a84f56;
+  --holiday-accent-strong:#82383f;
+  --holiday-border:#d7a4a8;
+  --holiday-surface:#fff1f2;
+  --holiday-text:#74343a;
+}
+
+/* Celda del calendario: rojo arcilla suave, sin bisel grueso. */
+.cal-cell.has-national-holiday:not(.selected){
+  color:var(--holiday-text);
+  background:
+    linear-gradient(145deg,color-mix(in srgb,var(--holiday-accent) 14%,transparent),transparent 70%),
+    color-mix(in srgb,var(--holiday-surface) 88%,var(--v5-surface));
+  border:1px solid color-mix(in srgb,var(--holiday-border) 72%,var(--v5-line));
+  box-shadow:none;
+}
+html[data-theme="light"] .cal-cell.has-national-holiday:not(.selected){
+  background:linear-gradient(145deg,#fff6f6,#fcecee);
+}
+.cal-cell.has-national-holiday .cal-day-number{
+  color:var(--holiday-text);
+  font-weight:850;
+}
+html[data-theme="light"] .cal-cell.has-national-holiday .cal-day-number{
+  color:var(--holiday-accent-strong);
+}
+.cal-cell.has-national-holiday::before,
+.cal-cell.has-national-holiday::after{
+  display:none!important;
+}
+.cal-cell.has-national-holiday.selected{
+  color:var(--v5-text);
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--v5-brand) 15%,transparent),transparent 55%),
+    color-mix(in srgb,var(--holiday-accent) 15%,var(--v5-surface));
+  border-color:var(--v5-brand);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb,var(--holiday-accent) 36%,transparent),
+    inset 0 0 0 1px color-mix(in srgb,var(--holiday-border) 32%,transparent);
+}
+html[data-theme="light"] .cal-cell.has-national-holiday.selected{
+  background:linear-gradient(135deg,#fff0c9 0 45%,#fbe7e9 100%);
+}
+.cal-cell.has-national-holiday.selected .cal-day-number{
+  color:inherit;
+}
+.cal-holiday-label{
+  position:absolute;
+  left:4px;
+  right:4px;
+  bottom:3px;
+  overflow:hidden;
+  color:color-mix(in srgb,var(--holiday-text) 90%,white 10%);
+  font-size:5.8px;
+  font-weight:900;
+  letter-spacing:.055em;
+  line-height:1;
+  text-align:center;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+html[data-theme="light"] .cal-holiday-label{
+  color:var(--holiday-accent-strong);
+}
+.cal-cell.has-national-holiday:has(.activity-line) .cal-holiday-label{
+  bottom:3px;
+}
+.cal-cell.has-national-holiday .activity-line{
+  bottom:12px;
+}
+.legend-holiday-cell{
+  position:relative;
+  display:inline-block;
+  width:14px;
+  height:14px;
+  border:1px solid var(--holiday-border);
+  border-radius:4px;
+  background:color-mix(in srgb,var(--holiday-accent) 12%,var(--v5-surface));
+}
+.legend-holiday-cell::after{
+  content:"";
+  position:absolute;
+  left:3px;
+  right:3px;
+  bottom:2px;
+  height:2px;
+  border-radius:999px;
+  background:var(--holiday-accent);
+}
+
+/* Ficha con el nombre oficial del feriado. */
+.holiday-detail-card{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  align-items:center;
+  gap:11px;
+  margin:0 0 12px;
+  padding:12px 13px;
+  border:1px solid color-mix(in srgb,var(--holiday-border) 70%,var(--v5-line));
+  border-radius:17px;
+  background:
+    linear-gradient(135deg,color-mix(in srgb,var(--holiday-accent) 12%,transparent),transparent 62%),
+    color-mix(in srgb,var(--holiday-surface) 64%,var(--v5-surface));
+}
+.holiday-detail-icon{
+  display:grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  border:1px solid color-mix(in srgb,var(--holiday-border) 72%,transparent);
+  border-radius:13px;
+  color:var(--holiday-text);
+  background:color-mix(in srgb,var(--holiday-accent) 17%,transparent);
+}
+.holiday-detail-icon svg{width:21px;height:21px;}
+.holiday-detail-copy{
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  gap:2px;
+}
+.holiday-detail-copy>span{
+  color:var(--holiday-accent);
+  font-size:8.5px;
+  font-weight:850;
+  letter-spacing:.085em;
+  text-transform:uppercase;
+}
+.holiday-detail-copy strong{
+  overflow:hidden;
+  color:var(--v5-text);
+  font-size:14px;
+  line-height:1.2;
+  text-overflow:ellipsis;
+}
+.holiday-detail-copy small{
+  color:var(--v5-muted);
+  font-size:9.5px;
+}
+.holiday-national-badge{
+  padding:5px 8px;
+  border:1px solid color-mix(in srgb,var(--holiday-border) 75%,transparent);
+  border-radius:999px;
+  color:var(--holiday-text);
+  background:color-mix(in srgb,var(--holiday-accent) 16%,transparent);
+  font-size:8px;
+  font-weight:850;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+html[data-theme="light"] .holiday-detail-icon,
+html[data-theme="light"] .holiday-national-badge{
+  color:var(--holiday-accent-strong);
+}
+.holiday-empty-day{
+  border-color:color-mix(in srgb,var(--holiday-border) 65%,var(--v5-line));
+  background:color-mix(in srgb,var(--holiday-surface) 65%,var(--v5-surface));
+}
+.holiday-empty-day .empty-orbit{
+  color:var(--holiday-text);
+  border-color:var(--holiday-border);
+  background:color-mix(in srgb,var(--holiday-accent) 16%,transparent);
+}
+html[data-theme="light"] .holiday-empty-day .empty-orbit{
+  color:var(--holiday-accent-strong);
+}
+.holiday-search-empty{
+  border-color:color-mix(in srgb,var(--holiday-border) 60%,var(--v5-line));
+  background:color-mix(in srgb,var(--holiday-surface) 55%,var(--v5-surface));
+}
+
+/* Señales del encabezado ejecutivo. */
+.brief-signal.holiday{
+  border-color:color-mix(in srgb,var(--holiday-border) 65%,var(--v5-line));
+  color:var(--holiday-text);
+  background:color-mix(in srgb,var(--holiday-accent) 13%,var(--v5-card));
+}
+.brief-signal.holiday strong{color:var(--holiday-text);}
+html[data-theme="light"] .brief-signal.holiday,
+html[data-theme="light"] .brief-signal.holiday strong{
+  color:var(--holiday-accent-strong);
+}
+.stat-chip.holiday{
+  border-color:color-mix(in srgb,var(--holiday-border) 58%,var(--v5-line));
+  color:var(--holiday-text);
+  background:color-mix(in srgb,var(--holiday-accent) 11%,var(--v5-card));
+}
+.stat-chip.holiday .dot{background:var(--holiday-accent)!important;}
+html[data-theme="light"] .stat-chip.holiday{color:var(--holiday-accent-strong);}
+
+@media(max-width:759px){
+  .cal-holiday-label{
+    left:2px;
+    right:2px;
+    bottom:2px;
+    font-size:5.2px;
+    letter-spacing:.025em;
+  }
+  .cal-cell.has-national-holiday .activity-line{bottom:10px;}
+  .holiday-detail-card{
+    grid-template-columns:39px minmax(0,1fr);
+    gap:9px;
+    padding:10px;
+    border-radius:15px;
+  }
+  .holiday-detail-icon{
+    width:38px;
+    height:38px;
+    border-radius:11px;
+  }
+  .holiday-detail-copy strong{font-size:13px;}
+  .holiday-detail-copy small{font-size:9px;}
+  .holiday-national-badge{
+    grid-column:2;
+    justify-self:start;
+    margin-top:2px;
+    padding:4px 7px;
+  }
+}
+
+@media(min-width:1100px){
+  .cal-holiday-label{
+    bottom:4px;
+    font-size:6.8px;
+  }
+  .cal-cell.has-national-holiday .activity-line{bottom:15px;}
+  .holiday-detail-card{
+    grid-template-columns:48px minmax(0,1fr) auto;
+    padding:14px 15px;
+  }
+  .holiday-detail-icon{width:46px;height:46px;}
+  .holiday-detail-copy strong{font-size:15px;}
+}

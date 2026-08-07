@@ -1,9 +1,9 @@
-const CACHE_NAME = 'agenda-presidenta-shell-603';
+const CACHE_NAME = 'agenda-presidenta-shell-604';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=603',
-  './app.js?v=603',
+  './styles.css?v=604',
+  './app.js?v=604',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

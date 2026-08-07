@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · legibilidad móvil y compatibilidad de voz en iPhone
+// Agenda Presidencia · feriados nacionales de Chile con actualización automática
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -190,6 +190,230 @@ function compareEventsChronologically(a,b) {
   return String(a.ACTIVIDAD||'').localeCompare(String(b.ACTIVIDAD||''),'es',{sensitivity:'base'});
 }
 
+
+/* --------------------------------------------------------------------------
+   Feriados nacionales de Chile
+   - Respaldo local calculado para funcionamiento sin conexión.
+   - Actualización automática mediante un catálogo público de feriados.
+   - La interfaz muestra únicamente feriados de alcance nacional.
+   -------------------------------------------------------------------------- */
+
+const CHILE_HOLIDAY_API='https://date.nager.at/api/v3/PublicHolidays';
+const CHILE_HOLIDAY_CACHE_TTL=24*60*60*1000;
+const chileHolidayYears=new Map();
+const chileHolidayLoads=new Map();
+
+function holidayDateKey(year,month,day){
+  return `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
+}
+
+function cloneDate(date){
+  return new Date(date.getFullYear(),date.getMonth(),date.getDate());
+}
+
+function calculateEasterSunday(year){
+  const a=year%19;
+  const b=Math.floor(year/100);
+  const c=year%100;
+  const d=Math.floor(b/4);
+  const e=b%4;
+  const f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4);
+  const k=c%4;
+  const l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31);
+  const day=((h+l-7*m+114)%31)+1;
+  return new Date(year,month-1,day);
+}
+
+function shiftedMondayHoliday(date){
+  const result=cloneDate(date);
+  const weekday=result.getDay();
+  if([2,3,4].includes(weekday)) result.setDate(result.getDate()-(weekday-1));
+  else if(weekday===5) result.setDate(result.getDate()+3);
+  return result;
+}
+
+function evangelicalHolidayDate(year){
+  const date=new Date(year,9,31);
+  const weekday=date.getDay();
+  if(weekday===2) date.setDate(date.getDate()-4);
+  else if(weekday===3) date.setDate(date.getDate()+2);
+  return date;
+}
+
+function normalizedHolidayName(name=''){
+  const text=String(name).trim();
+  const lower=text.toLowerCase();
+  const rules=[
+    [/new year|año nuevo/,'Año Nuevo'],
+    [/good friday|viernes santo/,'Viernes Santo'],
+    [/holy saturday|s[áa]bado santo/,'Sábado Santo'],
+    [/labou?r day|d[ií]a del trabajo/,'Día del Trabajo'],
+    [/navy day|glorias navales|combate naval/,'Día de las Glorias Navales'],
+    [/indigenous|pueblos ind[ií]genas/,'Día Nacional de los Pueblos Indígenas'],
+    [/saint peter|san pedro/,'San Pedro y San Pablo'],
+    [/mount carmel|virgen del carmen/,'Día de la Virgen del Carmen'],
+    [/assumption|asunci[oó]n/,'Asunción de la Virgen'],
+    [/independence|independencia nacional/,'Independencia Nacional'],
+    [/army day|glorias del ej[eé]rcito/,'Día de las Glorias del Ejército'],
+    [/two worlds|dos mundos|columbus/,'Encuentro de Dos Mundos'],
+    [/evangelical|protestant|iglesias evang[eé]licas/,'Día Nacional de las Iglesias Evangélicas y Protestantes'],
+    [/all saints|todos los santos/,'Día de Todos los Santos'],
+    [/immaculate|inmaculada concepci[oó]n/,'Inmaculada Concepción'],
+    [/christmas|navidad/,'Navidad']
+  ];
+  for(const [pattern,label] of rules) if(pattern.test(lower)) return label;
+  return text||'Feriado nacional';
+}
+
+function fallbackChileHolidays(year){
+  const easter=calculateEasterSunday(year);
+  const goodFriday=cloneDate(easter); goodFriday.setDate(easter.getDate()-2);
+  const holySaturday=cloneDate(easter); holySaturday.setDate(easter.getDate()-1);
+  const peterPaul=shiftedMondayHoliday(new Date(year,5,29));
+  const twoWorlds=shiftedMondayHoliday(new Date(year,9,12));
+  const evangelical=evangelicalHolidayDate(year);
+
+  const list=[
+    {date:new Date(year,0,1),name:'Año Nuevo'},
+    {date:goodFriday,name:'Viernes Santo'},
+    {date:holySaturday,name:'Sábado Santo'},
+    {date:new Date(year,4,1),name:'Día del Trabajo'},
+    {date:new Date(year,4,21),name:'Día de las Glorias Navales'},
+    {date:new Date(year,5,21),name:'Día Nacional de los Pueblos Indígenas'},
+    {date:peterPaul,name:'San Pedro y San Pablo'},
+    {date:new Date(year,6,16),name:'Día de la Virgen del Carmen'},
+    {date:new Date(year,7,15),name:'Asunción de la Virgen'},
+    {date:new Date(year,8,18),name:'Independencia Nacional'},
+    {date:new Date(year,8,19),name:'Día de las Glorias del Ejército'},
+    {date:twoWorlds,name:'Encuentro de Dos Mundos'},
+    {date:evangelical,name:'Día Nacional de las Iglesias Evangélicas y Protestantes'},
+    {date:new Date(year,10,1),name:'Día de Todos los Santos'},
+    {date:new Date(year,11,8),name:'Inmaculada Concepción'},
+    {date:new Date(year,11,25),name:'Navidad'}
+  ];
+
+  return list.map(item=>({
+    date:formatDateKey(item.date),
+    name:item.name,
+    type:'Feriado nacional',
+    national:true,
+    source:year===2026?'Calendario oficial Chile 2026':'Respaldo legal calculado'
+  }));
+}
+
+function setHolidayYear(year,items,{replace=false}={}){
+  const existing=replace?new Map():(chileHolidayYears.get(year)||new Map());
+  items.forEach(item=>{
+    const canonical=normalizeDateKey(item.date);
+    if(!canonical) return;
+    existing.set(canonical,{
+      date:canonical,
+      name:normalizedHolidayName(item.name),
+      type:'Feriado nacional',
+      national:true,
+      source:item.source||'Calendario nacional'
+    });
+  });
+  chileHolidayYears.set(year,existing);
+}
+
+function seedChileHolidayYear(year){
+  if(!chileHolidayYears.has(year)) setHolidayYear(year,fallbackChileHolidays(year),{replace:true});
+}
+
+function readCachedChileHolidays(year){
+  try{
+    const raw=localStorage.getItem(`agenda-feriados-cl-${year}`);
+    if(!raw) return null;
+    const cached=JSON.parse(raw);
+    if(!cached||!Array.isArray(cached.items)||Date.now()-Number(cached.savedAt)>CHILE_HOLIDAY_CACHE_TTL) return null;
+    return cached.items;
+  }catch{
+    return null;
+  }
+}
+
+function storeCachedChileHolidays(year,items){
+  try{
+    localStorage.setItem(`agenda-feriados-cl-${year}`,JSON.stringify({savedAt:Date.now(),items}));
+  }catch{
+    // La agenda continúa con el respaldo local si el navegador bloquea almacenamiento.
+  }
+}
+
+async function loadChileHolidayYear(year){
+  seedChileHolidayYear(year);
+  if(chileHolidayLoads.has(year)) return chileHolidayLoads.get(year);
+
+  const request=(async()=>{
+    const cached=readCachedChileHolidays(year);
+    if(cached?.length) setHolidayYear(year,cached,{replace:true});
+
+    try{
+      const response=await fetch(`${CHILE_HOLIDAY_API}/${year}/CL`,{cache:'no-cache'});
+      if(!response.ok) throw new Error('Catálogo de feriados no disponible');
+      const payload=await response.json();
+      const national=Array.isArray(payload)?payload
+        .filter(item=>item&&item.date&&item.global!==false)
+        .map(item=>({
+          date:normalizeDateKey(item.date),
+          name:normalizedHolidayName(item.localName||item.name),
+          source:'Actualización automática'
+        }))
+        .filter(item=>item.date):[];
+
+      if(national.length){
+        setHolidayYear(year,national,{replace:true});
+        storeCachedChileHolidays(year,national);
+        if(lastSuccessfulLoadAt){
+          updateHeaderStats();
+          render();
+        }
+      }
+    }catch{
+      // Silencioso: se utiliza el calendario local de respaldo.
+    }
+  })().finally(()=>chileHolidayLoads.delete(year));
+
+  chileHolidayLoads.set(year,request);
+  return request;
+}
+
+function ensureChileHolidayYear(year){
+  seedChileHolidayYear(year);
+  loadChileHolidayYear(year);
+}
+
+function getChileHoliday(date){
+  if(!(date instanceof Date)||Number.isNaN(date.getTime())) return null;
+  const year=date.getFullYear();
+  ensureChileHolidayYear(year);
+  return chileHolidayYears.get(year)?.get(formatDateKey(date))||null;
+}
+
+function renderHolidayDetailCard(holiday,eventCount=0){
+  if(!holiday) return '';
+  const activityNote=eventCount
+    ? `${eventCount} ${eventCount===1?'actividad excepcional registrada':'actividades excepcionales registradas'}`
+    : 'Sin actividades agendadas';
+  return `<section class="holiday-detail-card" aria-label="Feriado nacional: ${escapeHTML(holiday.name)}">
+    <div class="holiday-detail-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m8.5 15 2 2 5-5"/></svg>
+    </div>
+    <div class="holiday-detail-copy">
+      <span>Feriado legal en Chile</span>
+      <strong>${escapeHTML(holiday.name)}</strong>
+      <small>${activityNote}</small>
+    </div>
+    <span class="holiday-national-badge">Nacional</span>
+  </section>`;
+}
+
 function todayAtMidnight(){
   const date=new Date(); date.setHours(0,0,0,0); return date;
 }
@@ -299,6 +523,7 @@ function buildTabs() {
 
 function updateHeaderStats() {
   const today=new Date(); today.setHours(0,0,0,0);
+  const holiday=getChileHoliday(today);
   const todayEvents=allEvents.filter(event=>sameDay(parseDate(event.FECHA),today));
   const confirmed=todayEvents.filter(event=>getStatus(event)==='Confirmada').length;
   const toConfirm=todayEvents.filter(event=>getStatus(event)==='Por Confirmar').length;
@@ -306,6 +531,7 @@ function updateHeaderStats() {
   const absent=todayEvents.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event)).length;
   document.getElementById('headerStats').innerHTML=`
     <div class="stat-chip primary"><span class="dot" style="background:#4f9c83"></span>${todayEvents.length} hoy</div>
+    ${holiday?`<div class="stat-chip holiday"><span class="dot"></span>${escapeHTML(holiday.name)}</div>`:''}
     ${confirmed?`<div class="stat-chip"><span class="dot" style="background:#4f9c83"></span>${confirmed} confirmada${confirmed===1?'':'s'}</div>`:''}
     ${toConfirm?`<div class="stat-chip"><span class="dot" style="background:#7d72a7"></span>${toConfirm} por confirmar</div>`:''}
     ${pending?`<div class="stat-chip"><span class="dot" style="background:#b98135"></span>${pending} pendiente${pending===1?'':'s'}</div>`:''}
@@ -314,6 +540,7 @@ function updateHeaderStats() {
 }
 
 function updateExecutiveBrief(today,todayEvents) {
+  const holiday=getChileHoliday(today);
   const hour=new Date().getHours();
   const greeting=hour<12?'Buenos días':hour<20?'Buenas tardes':'Buenas noches';
   const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada').slice().sort(compareEventsChronologically);
@@ -328,7 +555,12 @@ function updateExecutiveBrief(today,todayEvents) {
   document.getElementById('briefTitle').textContent=`${greeting}, Presidenta.`;
 
   let subtitle='No hay actividades registradas para hoy.';
-  if(active.length===absences.length&&absences.length){
+  if(holiday){
+    const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
+    if(next) subtitle=`Hoy es ${holiday.name}. Tiene ${count}; la próxima comienza a las ${formatTime(next.HORA)}.`;
+    else if(active.length) subtitle=`Hoy es ${holiday.name}. Tiene ${count} registrada${active.length===1?'':'s'}.`;
+    else subtitle=`Hoy es feriado nacional: ${holiday.name}. No hay actividades agendadas.`;
+  }else if(active.length===absences.length&&absences.length){
     subtitle='La jornada está registrada como ausencia, permiso, curso o feriado legal.';
   }else if(active.length){
     const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
@@ -343,6 +575,7 @@ function updateExecutiveBrief(today,todayEvents) {
   document.getElementById('briefSubtitle').textContent=subtitle;
 
   const signals=[];
+  if(holiday) signals.push(`<span class="brief-signal holiday"><strong>Feriado nacional</strong><span>${escapeHTML(holiday.name)}</span></span>`);
   if(next){
     const temporal=eventTemporalMeta(next);
     signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><span class="brief-signal-copy"><strong>Próxima actividad</strong><span class="brief-signal-detail"><b>${formatTime(next.HORA)}</b><span>${escapeHTML(next.ACTIVIDAD)}</span></span></span><em>${temporal.label}</em></button>`);
@@ -430,7 +663,7 @@ function isCalendarAbsenceEvent(event){
   return status==='Ausente'||(status!=='Cancelada'&&isSpecialActivity(event));
 }
 
-function dayStatusSegments(dayEvents){
+function dayStatusSegments(dayEvents,{isHoliday=false}={}){
   const segments=[];
   const add=(name,label)=>{if(!segments.some(item=>item.name===name))segments.push({name,label});};
   const absenceEvents=dayEvents.filter(isCalendarAbsenceEvent);
@@ -438,7 +671,7 @@ function dayStatusSegments(dayEvents){
 
   // Una ausencia sola se reconoce mediante el cajón gris azulado, sin una segunda raya inferior.
   // La raya de ausencia aparece únicamente cuando el mismo día también contiene tareas reales.
-  if(absenceEvents.length&&taskEvents.length) add('absence','Ausencia');
+  if(absenceEvents.length&&taskEvents.length&&!isHoliday) add('absence','Ausencia');
   if(taskEvents.some(event=>getStatus(event)==='Por Confirmar')) add('confirm','Por confirmar');
   if(taskEvents.some(event=>getStatus(event)==='Pendiente')) add('pending','Pendiente');
   if(taskEvents.some(event=>getStatus(event)==='Confirmada')) add('confirmed','Confirmada');
@@ -472,11 +705,14 @@ function moveCalendarMonth(delta){
 function renderSelectedDayPanel(){
   const selected=selectedCalDate||new Date();
   const events=selectedDayEvents();
+  const holiday=getChileHoliday(selected);
   const label=selected.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'});
   const isToday=sameDay(selected,new Date());
-  const summary=events.length
-    ? `${events.length} ${events.length===1?'actividad registrada':'actividades registradas'}`
-    : 'Sin actividades registradas';
+  const summary=holiday
+    ? `${holiday.type} · ${events.length?`${events.length} ${events.length===1?'actividad registrada':'actividades registradas'}`:'Sin actividades agendadas'}`
+    : events.length
+      ? `${events.length} ${events.length===1?'actividad registrada':'actividades registradas'}`
+      : 'Sin actividades registradas';
   const activeEvents=events.filter(event=>getStatus(event)!=='Cancelada');
   const first=activeEvents.find(event=>event.HORA);
   const next=isToday?nextTimedEventForToday():null;
@@ -485,14 +721,15 @@ function renderSelectedDayPanel(){
     <div class="day-panel-head">
       <button class="day-step" id="dayPrev" type="button" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="day-panel-copy">
-        <span class="day-panel-eyebrow">${isToday?'Hoy':'Día seleccionado'}</span>
+        <span class="day-panel-eyebrow">${holiday?`${isToday?'Hoy · ':''}Feriado nacional`:isToday?'Hoy':'Día seleccionado'}</span>
         <h3>${label.charAt(0).toUpperCase()+label.slice(1)}</h3>
         <p>${summary}${next?` · Próxima a las ${formatTime(next.HORA)}`:first?` · Primera a las ${formatTime(first.HORA)}`:''}</p>
       </div>
       <button class="day-step" id="dayNext" type="button" aria-label="Día siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
+    ${renderHolidayDetailCard(holiday,events.length)}
     <div class="day-panel-events">
-      ${events.length?events.map(renderCard).join(''):`<div class="calendar-empty-day"><div class="empty-orbit">✓</div><strong>Jornada disponible</strong><span>No hay actividades registradas para este día.</span><button type="button" id="emptyAddButton">Agregar actividad</button></div>`}
+      ${events.length?events.map(renderCard).join(''):`<div class="calendar-empty-day ${holiday?'holiday-empty-day':''}"><div class="empty-orbit">${holiday?'✦':'✓'}</div><strong>${holiday?'Sin actividades agendadas':'Jornada disponible'}</strong><span>${holiday?`La jornada corresponde a ${escapeHTML(holiday.name)}.`:'No hay actividades registradas para este día.'}</span><button type="button" id="emptyAddButton">${holiday?'Agregar actividad excepcional':'Agregar actividad'}</button></div>`}
     </div>
     <div class="swipe-hint">Deslice horizontalmente para cambiar de día</div>
   </aside>`;
@@ -500,6 +737,7 @@ function renderSelectedDayPanel(){
 
 function renderCalendar() {
   const year=calendarDate.getFullYear(), month=calendarDate.getMonth();
+  ensureChileHolidayYear(year);
   const today=new Date(); today.setHours(0,0,0,0);
   if(!selectedCalDate){
     selectedCalDate=(today.getMonth()===month&&today.getFullYear()===year)?new Date(today):new Date(year,month,1);
@@ -531,13 +769,15 @@ function renderCalendar() {
   const cellsHTML=cells.map(cell=>{
     const key=formatDateKey(cell.date);
     const dayEvents=(eventsByDate.get(key)||[]).slice().sort(compareEventsChronologically);
-    const segments=dayStatusSegments(dayEvents);
+    const holiday=getChileHoliday(cell.date);
+    const segments=dayStatusSegments(dayEvents,{isHoliday:Boolean(holiday)});
     const hasAbsence=dayEvents.some(isCalendarAbsenceEvent);
     const isToday=sameDay(cell.date,today);
     const isSelected=selectedCalDate&&sameDay(cell.date,selectedCalDate);
     const line=segments.length?`<span class="activity-line" aria-hidden="true">${segments.map(segment=>`<i class="${segment.name}"></i>`).join('')}</span>`:'';
-    const labels=[hasAbsence?'Ausencia':'',...segments.map(segment=>segment.label)].filter(Boolean).join(', ');
-    return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${hasAbsence?'has-absence':''}" data-date="${key}" type="button" aria-label="${key}${dayEvents.length?`, ${dayEvents.length} actividades, ${labels}`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${line}</button>`;
+    const holidayLabel=holiday?`<span class="cal-holiday-label" aria-hidden="true">Feriado</span>`:'';
+    const labels=[holiday?`${holiday.type}: ${holiday.name}`:'',hasAbsence&&!holiday?'Ausencia':'',...segments.map(segment=>segment.label)].filter(Boolean).join(', ');
+    return `<button class="cal-cell ${!cell.current?'other-month':''} ${isToday?'today':''} ${isSelected?'selected':''} ${hasAbsence?'has-absence':''} ${holiday?'has-national-holiday':''}" data-date="${key}" type="button" aria-label="${key}${labels?`, ${labels}`:''}${dayEvents.length?`, ${dayEvents.length} actividades`:''}" aria-pressed="${Boolean(isSelected)}"><span class="cal-day-number">${cell.date.getDate()}</span>${holidayLabel}${line}</button>`;
   }).join('');
   const selectedPanel=renderSelectedDayPanel();
   return `<section class="calendar-workspace ${calendarMotion?`calendar-motion-${calendarMotion}`:''}">
@@ -563,6 +803,7 @@ function renderCalendar() {
         <span><i class="legend-selected"></i>Seleccionado</span>
         <span><i class="legend-line confirmed"></i>Confirmada</span>
         <span><i class="legend-line confirm"></i>Por confirmar</span>
+        <span><i class="legend-holiday-cell"></i>Feriado nacional</span>
         <span><i class="legend-absence-cell"></i>Ausencia</span>
       </div>
     </div>
@@ -1087,17 +1328,20 @@ function showSearchResults(query,results,voice=false){
   const parsed=parseSpanishQuery(query);
   const exactDateEmpty=!results.length&&parsed.targetDate&&hasExplicitDateExpression(query);
   const dateLabel=exactDateEmpty?formatVoiceDate(parsed.targetDate):'';
+  const holiday=exactDateEmpty?getChileHoliday(parsed.targetDate):null;
   info.style.display='block';
   info.classList.toggle('voice-date-feedback',exactDateEmpty);
   info.textContent=results.length
     ? `${voice?'Orden comprendida · ':''}${results.length} resultado${results.length!==1?'s':''} para “${query}”`
     : exactDateEmpty
-      ? `Sin actividad agendada para ${dateLabel}.`
+      ? holiday?`Feriado nacional: ${holiday.name}. Sin actividad agendada para ${dateLabel}.`:`Sin actividad agendada para ${dateLabel}.`
       : `Sin resultados para “${query}”`;
   document.getElementById('content').innerHTML=results.length
     ? renderGroups(results)
     : exactDateEmpty
-      ? `<div class="empty empty-date"><div class="icon">✓</div><p><strong>Sin actividad agendada</strong><br>${escapeHTML(dateLabel)}</p></div>`
+      ? holiday
+        ? `<div class="empty empty-date holiday-search-empty"><div class="icon">✦</div><p><strong>${escapeHTML(holiday.name)}</strong><br>Feriado nacional · Sin actividad agendada<br>${escapeHTML(dateLabel)}</p></div>`
+        : `<div class="empty empty-date"><div class="icon">✓</div><p><strong>Sin actividad agendada</strong><br>${escapeHTML(dateLabel)}</p></div>`
       : `<div class="empty"><div class="icon">🔍</div><p>Sin resultados para<br><strong>${escapeHTML(query)}</strong></p></div>`;
   bindCardActions();
 }
@@ -1119,15 +1363,16 @@ function executeVoiceCommand(text){
     setView('calendario');
     render();
     const dateLabel=formatVoiceDate(parsedCommand.targetDate);
+    const holiday=getChileHoliday(parsedCommand.targetDate);
     const info=document.getElementById('searchInfo');
     info.style.display='block';
     info.classList.add('voice-date-feedback');
     if(dateEvents.length){
-      info.textContent=`${dateEvents.length} ${dateEvents.length===1?'actividad agendada':'actividades agendadas'} para ${dateLabel}.`;
+      info.textContent=`${dateEvents.length} ${dateEvents.length===1?'actividad agendada':'actividades agendadas'} para ${dateLabel}.${holiday?` Feriado nacional: ${holiday.name}.`:''}`;
       showToast(`${dateEvents.length} ${dateEvents.length===1?'actividad':'actividades'} · ${dateLabel}`);
     }else{
-      info.textContent=`Sin actividad agendada para ${dateLabel}.`;
-      showToast('Sin actividad agendada');
+      info.textContent=holiday?`Feriado nacional: ${holiday.name}. Sin actividad agendada para ${dateLabel}.`:`Sin actividad agendada para ${dateLabel}.`;
+      showToast(holiday?holiday.name:'Sin actividad agendada');
     }
     haptic(12);
     return;
@@ -1525,6 +1770,8 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('online', () => loadData({silent:true}));
 
+ensureChileHolidayYear(new Date().getFullYear());
+ensureChileHolidayYear(new Date().getFullYear()+1);
 loadData();
 
 
