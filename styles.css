@@ -4370,3 +4370,80 @@ html[data-theme="light"] .stat-chip.holiday{color:var(--holiday-accent-strong);}
   .holiday-detail-icon{width:46px;height:46px;}
   .holiday-detail-copy strong{font-size:15px;}
 }
+
+/* ==========================================================================
+   6.0.5 · estabilidad táctil del calendario
+   ========================================================================== */
+
+/* La animación anterior se reiniciaba cada vez que la vista se renderizaba. */
+.cal-cell.selected{
+  animation:none!important;
+}
+.cal-cell:active{
+  transform:translateY(0) scale(.965);
+}
+
+/* Cambio de mes fluido, sin bajar la opacidad ni generar destellos. */
+.calendar-motion-next .calendar-card{
+  animation:v605MonthNext .25s cubic-bezier(.2,.8,.2,1)!important;
+}
+.calendar-motion-prev .calendar-card{
+  animation:v605MonthPrev .25s cubic-bezier(.2,.8,.2,1)!important;
+}
+@keyframes v605MonthNext{
+  from{transform:translateX(13px);}
+  to{transform:none;}
+}
+@keyframes v605MonthPrev{
+  from{transform:translateX(-13px);}
+  to{transform:none;}
+}
+
+.cal-grid{
+  touch-action:pan-y;
+  overscroll-behavior-x:contain;
+  -webkit-tap-highlight-color:transparent;
+}
+
+
+/* ==========================================================================
+   6.0.6 · Gestión manual de feriados
+   ========================================================================== */
+.create-choice-modal{max-width:520px;}
+.create-choice-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px;}
+.create-choice-card{display:grid;grid-template-columns:50px minmax(0,1fr);align-items:center;gap:12px;width:100%;padding:13px;border:1px solid var(--v5-line);border-radius:17px;color:var(--v5-text);background:var(--v5-surface);text-align:left;transition:transform .16s ease,border-color .16s ease,background .16s ease;}
+.create-choice-card:active{transform:scale(.985);}
+.create-choice-card strong{display:block;margin-bottom:3px;font-size:14px;}
+.create-choice-card small{display:block;color:var(--v5-muted);font-size:10px;line-height:1.35;}
+.create-choice-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;color:var(--v5-brand);background:color-mix(in srgb,var(--v5-brand) 12%,transparent);}
+.create-choice-icon svg{width:23px;height:23px;}
+.holiday-choice{border-color:color-mix(in srgb,var(--holiday-border) 52%,var(--v5-line));}
+.holiday-choice .create-choice-icon{color:var(--holiday-text);background:color-mix(in srgb,var(--holiday-accent) 14%,transparent);}
+html[data-theme="light"] .holiday-choice .create-choice-icon{color:var(--holiday-accent-strong);}
+
+.holiday-modal{max-width:560px;}
+.holiday-form-notice{display:flex;flex-direction:column;gap:3px;margin-bottom:14px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--holiday-border) 48%,var(--v5-line));border-radius:14px;background:color-mix(in srgb,var(--holiday-accent) 8%,var(--v5-surface));}
+.holiday-form-notice strong{color:var(--holiday-text);font-size:11px;}
+html[data-theme="light"] .holiday-form-notice strong{color:var(--holiday-accent-strong);}
+.holiday-form-notice span{color:var(--v5-muted);font-size:9.5px;line-height:1.45;}
+.holiday-save-button{background:linear-gradient(135deg,var(--holiday-accent),var(--holiday-accent-strong))!important;color:#fff!important;}
+
+.holiday-detail-card{grid-template-columns:44px minmax(0,1fr) auto;}
+.holiday-detail-card .holiday-manage-actions,.holiday-detail-card .holiday-protected-note{grid-column:2 / -1;}
+.holiday-manage-actions{display:flex;gap:7px;margin-top:4px;}
+.holiday-manage-btn{min-height:30px;padding:5px 9px;border:1px solid color-mix(in srgb,var(--holiday-border) 55%,var(--v5-line));border-radius:9px;color:var(--holiday-text);background:color-mix(in srgb,var(--holiday-accent) 9%,var(--v5-surface));font-size:8.5px;font-weight:750;}
+html[data-theme="light"] .holiday-manage-btn{color:var(--holiday-accent-strong);}
+.holiday-manage-btn.delete-holiday{opacity:.82;}
+.holiday-protected-note{color:var(--v5-muted);font-size:8px;letter-spacing:.04em;text-transform:uppercase;}
+.holiday-delete-confirm{background:linear-gradient(135deg,#b24f57,#853941)!important;}
+
+@media(min-width:760px){
+  .create-choice-grid{grid-template-columns:1fr 1fr;}
+  .create-choice-card{min-height:92px;}
+}
+@media(max-width:759px){
+  .create-choice-overlay .modal,.holiday-modal-overlay .modal{max-height:min(82dvh,720px);}
+  .create-choice-card{grid-template-columns:46px minmax(0,1fr);padding:12px;}
+  .create-choice-icon{width:44px;height:44px;}
+  .holiday-detail-card .holiday-manage-actions,.holiday-detail-card .holiday-protected-note{grid-column:2;}
+}

@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=604" />
+  <link rel="stylesheet" href="styles.css?v=606" />
 </head>
 <body>
 
@@ -156,6 +156,35 @@
 </span>Mes
   </button>
 </nav>
+
+<!-- MODAL: selector del botón + -->
+<div aria-labelledby="createChoiceTitle" aria-modal="true" class="modal-overlay create-choice-overlay" id="createChoiceModal" role="dialog">
+  <div class="modal create-choice-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-heading">
+      <div>
+        <h2 id="createChoiceTitle">Agregar a la agenda</h2>
+        <div class="modal-subtitle">Seleccione qué desea registrar.</div>
+      </div>
+      <button aria-label="Cerrar" class="modal-close" id="btnCloseCreateChoice" type="button">✕</button>
+    </div>
+    <div class="create-choice-grid">
+      <button class="create-choice-card activity-choice" id="createActivityChoice" type="button">
+        <span class="create-choice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M12 13v5M9.5 15.5h5"/></svg>
+        </span>
+        <span><strong>Nueva actividad</strong><small>Hora, modalidad, lugar y participantes.</small></span>
+      </button>
+      <button class="create-choice-card holiday-choice" id="createHolidayChoice" type="button">
+        <span class="create-choice-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m8.5 15 2 2 5-5"/></svg>
+        </span>
+        <span><strong>Agregar feriado</strong><small>Nacional, regional o electoral, registrado manualmente.</small></span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Nueva / editar actividad -->
 <div aria-labelledby="activityModalTitle" aria-modal="true" class="modal-overlay" id="activityModal" role="dialog">
 <div class="modal">
@@ -243,6 +272,75 @@
 </div>
 </div>
 
+
+<!-- MODAL: Agregar / editar feriado -->
+<div aria-labelledby="holidayModalTitle" aria-modal="true" class="modal-overlay holiday-modal-overlay" id="holidayModal" role="dialog">
+  <div class="modal holiday-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-heading">
+      <div>
+        <h2 id="holidayModalTitle">Agregar feriado</h2>
+        <div class="modal-subtitle" id="holidayModalSubtitle">Registre únicamente una fecha oficialmente confirmada.</div>
+      </div>
+      <button aria-label="Cerrar" class="modal-close" id="btnCloseHolidayModal" type="button">✕</button>
+    </div>
+
+    <div class="holiday-form-notice">
+      <strong>Calendario controlado</strong>
+      <span>Los nacionales oficiales se incorporan solo cuando han sido confirmados. Los regionales y electorales se agregan únicamente de forma manual.</span>
+    </div>
+
+    <div class="form-group">
+      <label for="hFecha">Fecha *</label>
+      <input id="hFecha" type="date"/>
+    </div>
+    <div class="form-group">
+      <label for="hNombre">Nombre del feriado *</label>
+      <input id="hNombre" maxlength="180" placeholder="Ej.: Asunción de la Virgen" type="text"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="hTipo">Tipo</label>
+        <select id="hTipo">
+          <option value="Feriado nacional">Feriado nacional</option>
+          <option value="Feriado regional">Feriado regional</option>
+          <option value="Feriado electoral">Feriado electoral</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="hAlcance">Alcance</label>
+        <input id="hAlcance" maxlength="100" placeholder="Nacional" type="text"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="hFuente">Fuente oficial o referencia</label>
+      <input id="hFuente" maxlength="220" placeholder="Ej.: Gobierno de Chile, Ley N°…, SERVEL" type="text"/>
+      <div class="field-helper">Para fechas extraordinarias conviene dejar la referencia que las respalda.</div>
+    </div>
+    <button class="btn-submit holiday-save-button" id="btnGuardarFeriado" type="button">Guardar feriado</button>
+    <button class="btn-cancel-modal" id="btnCancelarFeriado" type="button">Cancelar</button>
+    <p aria-live="polite" class="form-msg" id="holidayFormMsg"></p>
+  </div>
+</div>
+
+<!-- MODAL: Eliminar feriado -->
+<div aria-labelledby="holidayDeleteTitle" aria-modal="true" class="modal-overlay" id="holidayDeleteModal" role="dialog">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-handle"></div>
+    <div class="modal-heading">
+      <div>
+        <h2 id="holidayDeleteTitle">Eliminar feriado</h2>
+        <div class="modal-subtitle">Solo se pueden eliminar registros administrados manualmente.</div>
+      </div>
+      <button aria-label="Cerrar" class="modal-close" id="btnCloseHolidayDelete" type="button">✕</button>
+    </div>
+    <p class="confirm-copy">¿Confirma eliminar <span class="confirm-activity" id="holidayDeleteName"></span> del calendario?</p>
+    <button class="btn-danger holiday-delete-confirm" id="btnConfirmHolidayDelete" type="button">Sí, eliminar feriado</button>
+    <button class="btn-secondary" id="btnCancelHolidayDelete" type="button">Mantener feriado</button>
+    <p aria-live="polite" class="form-msg" id="holidayDeleteMsg"></p>
+  </div>
+</div>
+
 <!-- MODAL: Selector amigable de hora -->
 <div aria-labelledby="timePickerTitle" aria-modal="true" class="modal-overlay time-picker-overlay" id="timePickerModal" role="dialog">
 <div class="modal time-picker-modal">
@@ -307,6 +405,6 @@
 <div class="toast" id="toast"></div>
 
 
-<script src="app.js?v=604" defer></script>
+<script src="app.js?v=606" defer></script>
 </body>
 </html>

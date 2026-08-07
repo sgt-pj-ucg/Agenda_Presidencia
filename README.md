@@ -1,59 +1,58 @@
-# Agenda Presidenta 6.0.4 — Feriados nacionales de Chile
+# Agenda Presidenta 6.0.6 — administración de feriados
 
-Esta entrega incorpora identificación visual y consulta de feriados nacionales.
+## Política
 
-## Comportamiento visual
+- Los feriados nacionales oficiales de 2026 permanecen incorporados y protegidos.
+- 2027 y años siguientes se incorporan cuando exista confirmación oficial.
+- Los feriados regionales y electorales no se agregan automáticamente.
+- Cualquier feriado extraordinario puede registrarse manualmente desde la aplicación.
 
-En el calendario, cada feriado se muestra con:
+## Botón +
 
-- fondo rojo arcilla suave;
-- borde fino;
-- número del día destacado;
-- etiqueta `FERIADO`;
-- convivencia con las líneas de actividades cuando existen.
+El botón central ahora abre:
 
-Al seleccionar el día aparece una ficha con:
+- Nueva actividad
+- Agregar feriado
 
-- `Feriado legal en Chile`;
-- nombre del feriado;
-- alcance `Nacional`;
-- indicación de actividades excepcionales o ausencia de actividades.
+## Formulario de feriado
 
-Ejemplo:
+Permite registrar:
 
-- 15 de agosto
-- Asunción de la Virgen
-- Feriado nacional
-- Sin actividades agendadas
+- Fecha
+- Nombre oficial
+- Tipo: nacional, regional o electoral
+- Alcance
+- Fuente oficial o referencia
 
-## Actualización
+Los registros se guardan en la pestaña `FERIADOS_CHILE`.
 
-La aplicación utiliza un sistema híbrido:
+## Editar y eliminar
 
-1. calendario legal calculado localmente para seguir funcionando sin conexión;
-2. consulta automática de un catálogo público de feriados nacionales;
-3. caché local durante 24 horas;
-4. actualización al abrir años nuevos en el calendario.
+Los feriados agregados manualmente pueden editarse o eliminarse al seleccionar el día en el calendario.
 
-Los feriados regionales o comunales no se muestran en esta entrega.
+Los feriados del calendario oficial 2026 muestran `Oficial protegido` y no pueden modificarse desde la app.
 
-## Voz
+## Proceso recomendado cada diciembre
 
-Cuando se consulta una fecha sin actividades y corresponde a un feriado, la aplicación responde, por ejemplo:
+Cuando Gobierno de Chile publique oficialmente los feriados del año siguiente:
 
-`Feriado nacional: Asunción de la Virgen. Sin actividad agendada para el sábado 15 de agosto.`
+1. revisar la publicación oficial;
+2. agregar mediante `+ > Agregar feriado` únicamente los feriados nacionales;
+3. registrar el nombre oficial y, de ser posible, la fuente;
+4. agregar regionales o electorales solo manualmente si corresponden.
 
-## Archivos que deben subirse
+## Instalación técnica
 
-Reemplaza todo el contenido del repositorio con:
+### GitHub
+Reemplazar:
+- index.html
+- styles.css
+- app.js
+- service-worker.js
+- manifest.webmanifest
+- carpeta icons/
 
-- `index.html`
-- `styles.css`
-- `app.js`
-- `service-worker.js`
-- `manifest.webmanifest`
-- carpeta `icons/`
+### Apps Script
+Reemplazar el código por `Code.gs` y actualizar la implementación existente.
 
-No es necesario modificar `Code.gs`.
-
-Después de publicar, cierra completamente la aplicación instalada y vuelve a abrirla para actualizar la caché.
+No cambies la URL de Apps Script si actualizas la misma implementación.

@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · feriados nacionales de Chile con actualización automática
+// Agenda Presidencia · administración manual de feriados y calendario oficial controlado
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -15,6 +15,7 @@ let pendingDeleteEvent = null;
 let refreshTimer = null;
 let lastSuccessfulLoadAt = 0;
 let calendarMotion = '';
+let calendarSwipeLockUntil = 0;
 
 const CATEGORIES = [
   { id:'reuniones', label:'Reuniones', icon:'🤝', keywords:['reunión','reunion','reuniones'] },
@@ -193,117 +194,37 @@ function compareEventsChronologically(a,b) {
 
 /* --------------------------------------------------------------------------
    Feriados nacionales de Chile
-   - Respaldo local calculado para funcionamiento sin conexión.
-   - Actualización automática mediante un catálogo público de feriados.
-   - La interfaz muestra únicamente feriados de alcance nacional.
+   - El año 2026 usa el calendario oficial publicado por Gobierno de Chile.
+   - Los años futuros o feriados extraordinarios se leen desde FERIADOS_CHILE.
+   - No se generan fechas futuras mediante una fuente comercial o no oficial.
    -------------------------------------------------------------------------- */
 
-const CHILE_HOLIDAY_API='https://date.nager.at/api/v3/PublicHolidays';
-const CHILE_HOLIDAY_CACHE_TTL=24*60*60*1000;
+const OFFICIAL_CHILE_HOLIDAYS={
+  2026:[
+    ['01/01/2026','Año Nuevo',true],
+    ['03/04/2026','Viernes Santo',false],
+    ['04/04/2026','Sábado Santo',false],
+    ['01/05/2026','Día del Trabajo',true],
+    ['21/05/2026','Día de las Glorias Navales',false],
+    ['21/06/2026','Día Nacional de los Pueblos Indígenas',false],
+    ['29/06/2026','San Pedro y San Pablo',false],
+    ['16/07/2026','Día de la Virgen del Carmen',false],
+    ['15/08/2026','Asunción de la Virgen',false],
+    ['18/09/2026','Independencia Nacional',true],
+    ['19/09/2026','Día de las Glorias del Ejército',true],
+    ['12/10/2026','Encuentro de Dos Mundos',false],
+    ['31/10/2026','Día Nacional de las Iglesias Evangélicas',false],
+    ['01/11/2026','Día de Todos los Santos',false],
+    ['08/12/2026','Inmaculada Concepción',false],
+    ['25/12/2026','Navidad',true]
+  ]
+};
+
 const chileHolidayYears=new Map();
-const chileHolidayLoads=new Map();
-
-function holidayDateKey(year,month,day){
-  return `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
-}
-
-function cloneDate(date){
-  return new Date(date.getFullYear(),date.getMonth(),date.getDate());
-}
-
-function calculateEasterSunday(year){
-  const a=year%19;
-  const b=Math.floor(year/100);
-  const c=year%100;
-  const d=Math.floor(b/4);
-  const e=b%4;
-  const f=Math.floor((b+8)/25);
-  const g=Math.floor((b-f+1)/3);
-  const h=(19*a+b-d-g+15)%30;
-  const i=Math.floor(c/4);
-  const k=c%4;
-  const l=(32+2*e+2*i-h-k)%7;
-  const m=Math.floor((a+11*h+22*l)/451);
-  const month=Math.floor((h+l-7*m+114)/31);
-  const day=((h+l-7*m+114)%31)+1;
-  return new Date(year,month-1,day);
-}
-
-function shiftedMondayHoliday(date){
-  const result=cloneDate(date);
-  const weekday=result.getDay();
-  if([2,3,4].includes(weekday)) result.setDate(result.getDate()-(weekday-1));
-  else if(weekday===5) result.setDate(result.getDate()+3);
-  return result;
-}
-
-function evangelicalHolidayDate(year){
-  const date=new Date(year,9,31);
-  const weekday=date.getDay();
-  if(weekday===2) date.setDate(date.getDate()-4);
-  else if(weekday===3) date.setDate(date.getDate()+2);
-  return date;
-}
+let officialHolidaySheetSyncStarted=false;
 
 function normalizedHolidayName(name=''){
-  const text=String(name).trim();
-  const lower=text.toLowerCase();
-  const rules=[
-    [/new year|año nuevo/,'Año Nuevo'],
-    [/good friday|viernes santo/,'Viernes Santo'],
-    [/holy saturday|s[áa]bado santo/,'Sábado Santo'],
-    [/labou?r day|d[ií]a del trabajo/,'Día del Trabajo'],
-    [/navy day|glorias navales|combate naval/,'Día de las Glorias Navales'],
-    [/indigenous|pueblos ind[ií]genas/,'Día Nacional de los Pueblos Indígenas'],
-    [/saint peter|san pedro/,'San Pedro y San Pablo'],
-    [/mount carmel|virgen del carmen/,'Día de la Virgen del Carmen'],
-    [/assumption|asunci[oó]n/,'Asunción de la Virgen'],
-    [/independence|independencia nacional/,'Independencia Nacional'],
-    [/army day|glorias del ej[eé]rcito/,'Día de las Glorias del Ejército'],
-    [/two worlds|dos mundos|columbus/,'Encuentro de Dos Mundos'],
-    [/evangelical|protestant|iglesias evang[eé]licas/,'Día Nacional de las Iglesias Evangélicas y Protestantes'],
-    [/all saints|todos los santos/,'Día de Todos los Santos'],
-    [/immaculate|inmaculada concepci[oó]n/,'Inmaculada Concepción'],
-    [/christmas|navidad/,'Navidad']
-  ];
-  for(const [pattern,label] of rules) if(pattern.test(lower)) return label;
-  return text||'Feriado nacional';
-}
-
-function fallbackChileHolidays(year){
-  const easter=calculateEasterSunday(year);
-  const goodFriday=cloneDate(easter); goodFriday.setDate(easter.getDate()-2);
-  const holySaturday=cloneDate(easter); holySaturday.setDate(easter.getDate()-1);
-  const peterPaul=shiftedMondayHoliday(new Date(year,5,29));
-  const twoWorlds=shiftedMondayHoliday(new Date(year,9,12));
-  const evangelical=evangelicalHolidayDate(year);
-
-  const list=[
-    {date:new Date(year,0,1),name:'Año Nuevo'},
-    {date:goodFriday,name:'Viernes Santo'},
-    {date:holySaturday,name:'Sábado Santo'},
-    {date:new Date(year,4,1),name:'Día del Trabajo'},
-    {date:new Date(year,4,21),name:'Día de las Glorias Navales'},
-    {date:new Date(year,5,21),name:'Día Nacional de los Pueblos Indígenas'},
-    {date:peterPaul,name:'San Pedro y San Pablo'},
-    {date:new Date(year,6,16),name:'Día de la Virgen del Carmen'},
-    {date:new Date(year,7,15),name:'Asunción de la Virgen'},
-    {date:new Date(year,8,18),name:'Independencia Nacional'},
-    {date:new Date(year,8,19),name:'Día de las Glorias del Ejército'},
-    {date:twoWorlds,name:'Encuentro de Dos Mundos'},
-    {date:evangelical,name:'Día Nacional de las Iglesias Evangélicas y Protestantes'},
-    {date:new Date(year,10,1),name:'Día de Todos los Santos'},
-    {date:new Date(year,11,8),name:'Inmaculada Concepción'},
-    {date:new Date(year,11,25),name:'Navidad'}
-  ];
-
-  return list.map(item=>({
-    date:formatDateKey(item.date),
-    name:item.name,
-    type:'Feriado nacional',
-    national:true,
-    source:year===2026?'Calendario oficial Chile 2026':'Respaldo legal calculado'
-  }));
+  return String(name||'').trim()||'Feriado nacional';
 }
 
 function setHolidayYear(year,items,{replace=false}={}){
@@ -314,85 +235,83 @@ function setHolidayYear(year,items,{replace=false}={}){
     existing.set(canonical,{
       date:canonical,
       name:normalizedHolidayName(item.name),
-      type:'Feriado nacional',
-      national:true,
-      source:item.source||'Calendario nacional'
+      type:item.type||'Feriado nacional',
+      scope:item.scope||'Nacional',
+      national:item.national!==false,
+      irrenunciable:Boolean(item.irrenunciable),
+      source:item.source||'Calendario oficial',
+      _row:Number(item._row)||0,
+      protected:Boolean(item.protected)
     });
   });
   chileHolidayYears.set(year,existing);
 }
 
-function seedChileHolidayYear(year){
-  if(!chileHolidayYears.has(year)) setHolidayYear(year,fallbackChileHolidays(year),{replace:true});
+function seedOfficialChileHolidayYear(year){
+  if(chileHolidayYears.has(year)) return;
+  const rows=OFFICIAL_CHILE_HOLIDAYS[year]||[];
+  setHolidayYear(year,rows.map(([date,name,irrenunciable])=>({
+    date,
+    name,
+    irrenunciable,
+    type:'Feriado nacional',
+    national:true,
+    source:'Gobierno de Chile · calendario oficial 2026',
+    scope:'Nacional',
+    protected:true
+  })),{replace:true});
 }
 
-function readCachedChileHolidays(year){
+function mergeOfficialHolidaySheetRows(rows){
+  if(!Array.isArray(rows)) return;
+  const grouped=new Map();
+  rows.forEach(item=>{
+    if(!item||item.activo===false) return;
+    const date=normalizeDateKey(item.fecha||item.date);
+    if(!date) return;
+    const year=parseDate(date)?.getFullYear();
+    if(!year) return;
+    if(!grouped.has(year)) grouped.set(year,[]);
+    grouped.get(year).push({
+      date,
+      name:item.nombre||item.name,
+      type:item.tipo||'Feriado nacional',
+      scope:item.alcance||'Nacional',
+      national:String(item.tipo||'').toLowerCase().includes('nacional'),
+      source:item.fuente||'FERIADOS_CHILE',
+      _row:Number(item.fila||item._row)||0,
+      protected:Boolean(item.protegido)
+    });
+  });
+  grouped.forEach((items,year)=>{
+    seedOfficialChileHolidayYear(year);
+    setHolidayYear(year,items);
+  });
+}
+
+async function syncOfficialChileHolidaysFromSheet(){
+  if(officialHolidaySheetSyncStarted) return;
+  officialHolidaySheetSyncStarted=true;
   try{
-    const raw=localStorage.getItem(`agenda-feriados-cl-${year}`);
-    if(!raw) return null;
-    const cached=JSON.parse(raw);
-    if(!cached||!Array.isArray(cached.items)||Date.now()-Number(cached.savedAt)>CHILE_HOLIDAY_CACHE_TTL) return null;
-    return cached.items;
-  }catch{
-    return null;
-  }
-}
-
-function storeCachedChileHolidays(year,items){
-  try{
-    localStorage.setItem(`agenda-feriados-cl-${year}`,JSON.stringify({savedAt:Date.now(),items}));
-  }catch{
-    // La agenda continúa con el respaldo local si el navegador bloquea almacenamiento.
-  }
-}
-
-async function loadChileHolidayYear(year){
-  seedChileHolidayYear(year);
-  if(chileHolidayLoads.has(year)) return chileHolidayLoads.get(year);
-
-  const request=(async()=>{
-    const cached=readCachedChileHolidays(year);
-    if(cached?.length) setHolidayYear(year,cached,{replace:true});
-
-    try{
-      const response=await fetch(`${CHILE_HOLIDAY_API}/${year}/CL`,{cache:'no-cache'});
-      if(!response.ok) throw new Error('Catálogo de feriados no disponible');
-      const payload=await response.json();
-      const national=Array.isArray(payload)?payload
-        .filter(item=>item&&item.date&&item.global!==false)
-        .map(item=>({
-          date:normalizeDateKey(item.date),
-          name:normalizedHolidayName(item.localName||item.name),
-          source:'Actualización automática'
-        }))
-        .filter(item=>item.date):[];
-
-      if(national.length){
-        setHolidayYear(year,national,{replace:true});
-        storeCachedChileHolidays(year,national);
-        if(lastSuccessfulLoadAt){
-          updateHeaderStats();
-          render();
-        }
-      }
-    }catch{
-      // Silencioso: se utiliza el calendario local de respaldo.
+    const payload=await sendScriptAction('feriados');
+    mergeOfficialHolidaySheetRows(payload?.feriados);
+    if(lastSuccessfulLoadAt){
+      updateHeaderStats();
+      render();
     }
-  })().finally(()=>chileHolidayLoads.delete(year));
-
-  chileHolidayLoads.set(year,request);
-  return request;
+  }catch{
+    // La aplicación continúa con la lista oficial 2026 incorporada.
+  }
 }
 
 function ensureChileHolidayYear(year){
-  seedChileHolidayYear(year);
-  loadChileHolidayYear(year);
+  seedOfficialChileHolidayYear(year);
 }
 
 function getChileHoliday(date){
   if(!(date instanceof Date)||Number.isNaN(date.getTime())) return null;
   const year=date.getFullYear();
-  ensureChileHolidayYear(year);
+  seedOfficialChileHolidayYear(year);
   return chileHolidayYears.get(year)?.get(formatDateKey(date))||null;
 }
 
@@ -401,16 +320,23 @@ function renderHolidayDetailCard(holiday,eventCount=0){
   const activityNote=eventCount
     ? `${eventCount} ${eventCount===1?'actividad excepcional registrada':'actividades excepcionales registradas'}`
     : 'Sin actividades agendadas';
-  return `<section class="holiday-detail-card" aria-label="Feriado nacional: ${escapeHTML(holiday.name)}">
+  const manage=holiday.protected
+    ? `<span class="holiday-protected-note">Oficial protegido</span>`
+    : `<div class="holiday-manage-actions">
+        <button type="button" class="holiday-manage-btn edit-holiday" data-holiday-date="${escapeHTML(holiday.date)}">Editar</button>
+        <button type="button" class="holiday-manage-btn delete-holiday" data-holiday-date="${escapeHTML(holiday.date)}">Eliminar</button>
+      </div>`;
+  return `<section class="holiday-detail-card" aria-label="${escapeHTML(holiday.type)}: ${escapeHTML(holiday.name)}">
     <div class="holiday-detail-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="m8.5 15 2 2 5-5"/></svg>
     </div>
     <div class="holiday-detail-copy">
-      <span>Feriado legal en Chile</span>
+      <span>${escapeHTML(holiday.type)}</span>
       <strong>${escapeHTML(holiday.name)}</strong>
-      <small>${activityNote}</small>
+      <small>${escapeHTML(holiday.scope||'Nacional')} · ${activityNote}</small>
     </div>
-    <span class="holiday-national-badge">Nacional</span>
+    <span class="holiday-national-badge">${escapeHTML((holiday.scope||'Nacional').replace('Región de ','').slice(0,18))}</span>
+    ${manage}
   </section>`;
 }
 
@@ -721,7 +647,7 @@ function renderSelectedDayPanel(){
     <div class="day-panel-head">
       <button class="day-step" id="dayPrev" type="button" aria-label="Día anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="day-panel-copy">
-        <span class="day-panel-eyebrow">${holiday?`${isToday?'Hoy · ':''}Feriado nacional`:isToday?'Hoy':'Día seleccionado'}</span>
+        <span class="day-panel-eyebrow">${holiday?`${isToday?'Hoy · ':''}${escapeHTML(holiday.type)}`:isToday?'Hoy':'Día seleccionado'}</span>
         <h3>${label.charAt(0).toUpperCase()+label.slice(1)}</h3>
         <p>${summary}${next?` · Próxima a las ${formatTime(next.HORA)}`:first?` · Primera a las ${formatTime(first.HORA)}`:''}</p>
       </div>
@@ -822,25 +748,57 @@ function bindCalendarInteractions(){
   });
 
   const grid=document.getElementById('calGrid');
-  let calendarSwipeUntil=0;
   if(grid){
-    let startX=0,startY=0;
+    const gesture={startX:0,startY:0,lastX:0,lastY:0,horizontal:false};
     grid.addEventListener('touchstart',event=>{
-      startX=event.changedTouches[0]?.clientX||0;
-      startY=event.changedTouches[0]?.clientY||0;
+      const touch=event.changedTouches[0];
+      gesture.startX=touch?.clientX||0;
+      gesture.startY=touch?.clientY||0;
+      gesture.lastX=gesture.startX;
+      gesture.lastY=gesture.startY;
+      gesture.horizontal=false;
     },{passive:true});
+
+    grid.addEventListener('touchmove',event=>{
+      const touch=event.changedTouches[0];
+      gesture.lastX=touch?.clientX||gesture.lastX;
+      gesture.lastY=touch?.clientY||gesture.lastY;
+      const dx=gesture.lastX-gesture.startX;
+      const dy=gesture.lastY-gesture.startY;
+      if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.12){
+        gesture.horizontal=true;
+        event.preventDefault();
+      }
+    },{passive:false});
+
     grid.addEventListener('touchend',event=>{
-      const endX=event.changedTouches[0]?.clientX||0;
-      const endY=event.changedTouches[0]?.clientY||0;
-      const dx=endX-startX,dy=endY-startY;
-      if(Math.abs(dx)>58&&Math.abs(dx)>Math.abs(dy)*1.2){
-        calendarSwipeUntil=Date.now()+420;
+      const touch=event.changedTouches[0];
+      const endX=touch?.clientX??gesture.lastX;
+      const endY=touch?.clientY??gesture.lastY;
+      const dx=endX-gesture.startX;
+      const dy=endY-gesture.startY;
+      const isSwipe=gesture.horizontal&&Math.abs(dx)>54&&Math.abs(dx)>Math.abs(dy)*1.12;
+      if(isSwipe){
+        event.preventDefault();
+        calendarSwipeLockUntil=Date.now()+760;
         moveCalendarMonth(dx<0?1:-1);
       }
+      gesture.horizontal=false;
+    },{passive:false});
+
+    grid.addEventListener('touchcancel',()=>{
+      gesture.horizontal=false;
+      calendarSwipeLockUntil=Date.now()+180;
     },{passive:true});
+
     grid.addEventListener('click',event=>{
-      if(Date.now()<calendarSwipeUntil) return;
-      const cell=event.target.closest('.cal-cell'); if(!cell?.dataset.date) return;
+      if(Date.now()<calendarSwipeLockUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      const cell=event.target.closest('.cal-cell');
+      if(!cell?.dataset.date) return;
       const [d,m,y]=cell.dataset.date.split('/').map(Number);
       selectedCalDate=new Date(y,m-1,d);
       calendarDate=new Date(y,m-1,1);
@@ -871,7 +829,6 @@ function bindCalendarInteractions(){
   }
 }
 
-
 function bindBriefActions(){
   document.querySelector('[data-brief-action="next"]')?.addEventListener('click',()=>{
     const next=nextTimedEventForToday();
@@ -895,6 +852,7 @@ function render() {
   bindCardActions();
   if(currentView==='calendario') {
     bindCalendarInteractions();
+    bindHolidayActions();
     if(calendarMotion) window.setTimeout(()=>{calendarMotion='';},360);
   }
   bindBriefActions();
@@ -984,6 +942,11 @@ document.getElementById('briefCalendarButton')?.addEventListener('click',()=>{se
 const activityModal=document.getElementById('activityModal');
 const timePickerModal=document.getElementById('timePickerModal');
 const deleteModal=document.getElementById('deleteModal');
+const createChoiceModal=document.getElementById('createChoiceModal');
+const holidayModal=document.getElementById('holidayModal');
+const holidayDeleteModal=document.getElementById('holidayDeleteModal');
+let editingHoliday=null;
+let pendingHolidayDelete=null;
 const hiddenTimeInput=document.getElementById('fHora');
 const timeFieldValue=document.getElementById('timeFieldValue');
 const timePickerHour=document.getElementById('timePickerHour');
@@ -1039,11 +1002,201 @@ function closeActivityModal() {
   if(activityDictationRecognition?.isActive?.()) activityDictationRecognition.stop();
 }
 
-document.getElementById('navAdd').addEventListener('click',()=>openActivityModal('add'));
+document.getElementById('navAdd').addEventListener('click',openCreateChoiceModal);
 document.getElementById('btnCancelarModal').addEventListener('click',closeActivityModal);
 document.getElementById('btnCloseActivityModal').addEventListener('click',closeActivityModal);
 
 activityModal.addEventListener('click',event=>{if(event.target===activityModal)closeActivityModal();});
+
+
+function openCreateChoiceModal(){
+  createChoiceModal?.classList.add('open');
+}
+function closeCreateChoiceModal(){
+  createChoiceModal?.classList.remove('open');
+}
+
+document.getElementById('btnCloseCreateChoice')?.addEventListener('click',closeCreateChoiceModal);
+createChoiceModal?.addEventListener('click',event=>{if(event.target===createChoiceModal)closeCreateChoiceModal();});
+document.getElementById('createActivityChoice')?.addEventListener('click',()=>{
+  closeCreateChoiceModal();
+  openActivityModal('add');
+});
+document.getElementById('createHolidayChoice')?.addEventListener('click',()=>{
+  closeCreateChoiceModal();
+  openHolidayModal('add');
+});
+
+function defaultHolidayScope(type){
+  return type==='Feriado regional'?'Región de Coquimbo':'Nacional';
+}
+function resetHolidayForm(){
+  document.getElementById('hFecha').value='';
+  document.getElementById('hNombre').value='';
+  document.getElementById('hTipo').value='Feriado nacional';
+  document.getElementById('hAlcance').value='Nacional';
+  document.getElementById('hFuente').value='';
+  document.getElementById('holidayFormMsg').textContent='';
+}
+function openHolidayModal(mode='add',holiday=null){
+  editingHoliday=mode==='edit'?holiday:null;
+  resetHolidayForm();
+  const title=document.getElementById('holidayModalTitle');
+  const subtitle=document.getElementById('holidayModalSubtitle');
+  const save=document.getElementById('btnGuardarFeriado');
+
+  if(editingHoliday){
+    title.textContent='Editar feriado';
+    subtitle.textContent='Actualice solo fechas oficialmente confirmadas.';
+    save.textContent='Guardar cambios';
+    document.getElementById('hFecha').value=dateToInput(editingHoliday.date);
+    document.getElementById('hNombre').value=editingHoliday.name||'';
+    document.getElementById('hTipo').value=editingHoliday.type||'Feriado nacional';
+    document.getElementById('hAlcance').value=editingHoliday.scope||defaultHolidayScope(editingHoliday.type);
+    document.getElementById('hFuente').value=editingHoliday.source||'';
+  }else{
+    title.textContent='Agregar feriado';
+    subtitle.textContent='Registre únicamente una fecha oficialmente confirmada.';
+    save.textContent='Guardar feriado';
+    const base=selectedCalDate||new Date();
+    document.getElementById('hFecha').value=dateToInput(formatDateKey(base));
+  }
+  holidayModal.classList.add('open');
+  setTimeout(()=>document.getElementById('hNombre')?.focus(),240);
+}
+function closeHolidayModal(){
+  holidayModal?.classList.remove('open');
+  editingHoliday=null;
+}
+document.getElementById('btnCloseHolidayModal')?.addEventListener('click',closeHolidayModal);
+document.getElementById('btnCancelarFeriado')?.addEventListener('click',closeHolidayModal);
+holidayModal?.addEventListener('click',event=>{if(event.target===holidayModal)closeHolidayModal();});
+
+document.getElementById('hTipo')?.addEventListener('change',event=>{
+  const scope=document.getElementById('hAlcance');
+  if(!scope.value.trim()||['Nacional','Región de Coquimbo'].includes(scope.value.trim())){
+    scope.value=defaultHolidayScope(event.target.value);
+  }
+});
+
+function holidayPayloadFromForm(){
+  const input=document.getElementById('hFecha').value;
+  const type=document.getElementById('hTipo').value;
+  return {
+    fecha:normalizeDateKey(inputToDate(input)),
+    nombre:document.getElementById('hNombre').value.trim(),
+    tipo:type,
+    alcance:document.getElementById('hAlcance').value.trim()||defaultHolidayScope(type),
+    fuente:document.getElementById('hFuente').value.trim()||'Registro manual desde Agenda Presidenta'
+  };
+}
+
+document.getElementById('btnGuardarFeriado')?.addEventListener('click',async()=>{
+  const data=holidayPayloadFromForm();
+  const message=document.getElementById('holidayFormMsg');
+  const button=document.getElementById('btnGuardarFeriado');
+
+  if(!data.fecha||!data.nombre){
+    message.textContent='⚠️ Complete la fecha y el nombre del feriado.';
+    return;
+  }
+
+  button.disabled=true;
+  button.textContent=editingHoliday?'Guardando cambios…':'Guardando…';
+  message.textContent='';
+
+  try{
+    if(editingHoliday){
+      await sendScriptAction('feriado_editar',{
+        fila:editingHoliday._row,
+        fechaOriginal:editingHoliday.date,
+        nombreOriginal:editingHoliday.name,
+        fecha:data.fecha,
+        nombre:data.nombre,
+        tipo:data.tipo,
+        alcance:data.alcance,
+        fuente:data.fuente
+      });
+      showToast('✓ Feriado actualizado');
+    }else{
+      await sendScriptAction('feriado_nuevo',data);
+      showToast('✓ Feriado agregado');
+    }
+
+    closeHolidayModal();
+    officialHolidaySheetSyncStarted=false;
+    await syncOfficialChileHolidaysFromSheet();
+
+    const date=parseDate(data.fecha);
+    if(date){
+      selectedCalDate=new Date(date);
+      calendarDate=new Date(date.getFullYear(),date.getMonth(),1);
+      setView('calendario');
+    }
+    haptic([18,35,18]);
+    updateHeaderStats();
+    render();
+  }catch(error){
+    message.textContent=`⚠️ ${error.message||'No fue posible guardar el feriado.'}`;
+  }finally{
+    button.disabled=false;
+    button.textContent=editingHoliday?'Guardar cambios':'Guardar feriado';
+  }
+});
+
+function findHolidayByDate(dateKey){
+  const date=parseDate(dateKey);
+  return date?getChileHoliday(date):null;
+}
+function bindHolidayActions(){
+  document.querySelectorAll('.edit-holiday').forEach(button=>button.addEventListener('click',event=>{
+    event.stopPropagation();
+    const holiday=findHolidayByDate(button.dataset.holidayDate);
+    if(holiday&&!holiday.protected) openHolidayModal('edit',holiday);
+  }));
+  document.querySelectorAll('.delete-holiday').forEach(button=>button.addEventListener('click',event=>{
+    event.stopPropagation();
+    const holiday=findHolidayByDate(button.dataset.holidayDate);
+    if(!holiday||holiday.protected) return;
+    pendingHolidayDelete=holiday;
+    document.getElementById('holidayDeleteName').textContent=`“${holiday.name}”`;
+    document.getElementById('holidayDeleteMsg').textContent='';
+    holidayDeleteModal.classList.add('open');
+  }));
+}
+function closeHolidayDeleteModal(){
+  holidayDeleteModal?.classList.remove('open');
+  pendingHolidayDelete=null;
+}
+document.getElementById('btnCloseHolidayDelete')?.addEventListener('click',closeHolidayDeleteModal);
+document.getElementById('btnCancelHolidayDelete')?.addEventListener('click',closeHolidayDeleteModal);
+holidayDeleteModal?.addEventListener('click',event=>{if(event.target===holidayDeleteModal)closeHolidayDeleteModal();});
+
+document.getElementById('btnConfirmHolidayDelete')?.addEventListener('click',async()=>{
+  if(!pendingHolidayDelete) return;
+  const holiday={...pendingHolidayDelete};
+  const button=document.getElementById('btnConfirmHolidayDelete');
+  const message=document.getElementById('holidayDeleteMsg');
+  button.disabled=true;
+  button.textContent='Eliminando…';
+  message.textContent='';
+
+  try{
+    await sendScriptAction('feriado_eliminar',{fila:holiday._row,fecha:holiday.date,nombre:holiday.name});
+    closeHolidayDeleteModal();
+    officialHolidaySheetSyncStarted=false;
+    await syncOfficialChileHolidaysFromSheet();
+    haptic(28);
+    showToast('✓ Feriado eliminado');
+    updateHeaderStats();
+    render();
+  }catch(error){
+    message.textContent=`⚠️ ${error.message||'No fue posible eliminar el feriado.'}`;
+  }finally{
+    button.disabled=false;
+    button.textContent='Sí, eliminar feriado';
+  }
+});
 
 function clampTimePart(value,min,max){
   const number=Number.parseInt(value,10);
@@ -1187,6 +1340,44 @@ document.getElementById('btnGuardar').addEventListener('click',async()=>{
   }
 });
 
+
+function normalizedEventIdentity(event){
+  return {
+    fecha:normalizeDateKey(event?.FECHA),
+    hora:normalizeTimeValue(event?.HORA),
+    actividad:String(event?.ACTIVIDAD||'').trim().toLocaleLowerCase('es-CL').replace(/\s+/g,' '),
+    lugar:String(event?.LUGAR||'').trim().toLocaleLowerCase('es-CL').replace(/\s+/g,' '),
+    participantes:String(event?.PARTICIPANTES||'').trim().toLocaleLowerCase('es-CL').replace(/\s+/g,' ')
+  };
+}
+
+function sameEventIdentity(a,b){
+  const left=normalizedEventIdentity(a);
+  const right=normalizedEventIdentity(b);
+  return left.fecha===right.fecha&&
+    left.hora===right.hora&&
+    left.actividad===right.actividad&&
+    left.lugar===right.lugar&&
+    left.participantes===right.participantes;
+}
+
+function isRowLookupError(error){
+  return /localizar la actividad|no contiene actividades|fila/i.test(String(error?.message||''));
+}
+
+async function refreshAndResolveEvent(reference){
+  await loadData({silent:true});
+  const exact=allEvents.find(event=>sameEventIdentity(event,reference));
+  if(exact) return exact;
+  const target=normalizedEventIdentity(reference);
+  return allEvents.find(event=>{
+    const candidate=normalizedEventIdentity(event);
+    return candidate.fecha===target.fecha&&
+      candidate.hora===target.hora&&
+      candidate.actividad===target.actividad;
+  })||null;
+}
+
 function openDeleteModal(event) {
   pendingDeleteEvent=event;
   document.getElementById('deleteActivityName').textContent=`“${event.ACTIVIDAD}”`;
@@ -1202,16 +1393,57 @@ deleteModal.addEventListener('click',event=>{if(event.target===deleteModal)close
 
 document.getElementById('btnConfirmDelete').addEventListener('click',async()=>{
   if(!pendingDeleteEvent) return;
-  const item=pendingDeleteEvent;
+  const item={...pendingDeleteEvent};
   const button=document.getElementById('btnConfirmDelete');
   const message=document.getElementById('deleteMsg');
-  button.disabled=true; button.textContent='Eliminando…'; message.textContent='';
-  try {
-    await sendScriptAction('eliminar',{fila:item._row,fecha:item.FECHA,hora:item.HORA,actividad:item.ACTIVIDAD});
-    allEvents=allEvents.filter(event=>event!==item);
-    closeDeleteModal(); updateHeaderStats(); buildTabs(); render(); haptic(28); showToast('✓ Actividad eliminada'); scheduleRefresh();
-  } catch (error) { message.textContent=`⚠️ ${error.message||'No fue posible eliminar la actividad.'}`; }
-  finally { button.disabled=false; button.textContent='Sí, eliminar actividad'; }
+  button.disabled=true;
+  button.textContent='Eliminando…';
+  message.textContent='';
+  try{
+    let resolved=item;
+    try{
+      await sendScriptAction('eliminar',{
+        fila:resolved._row,
+        fecha:resolved.FECHA,
+        hora:resolved.HORA,
+        actividad:resolved.ACTIVIDAD
+      });
+    }catch(firstError){
+      if(!isRowLookupError(firstError)) throw firstError;
+      message.textContent='Verificando la actividad en la planilla…';
+      resolved=await refreshAndResolveEvent(item);
+      if(!resolved) throw firstError;
+
+      // Tras actualizar desde el CSV, la fila corresponde a la posición real
+      // de la planilla. El envío exclusivo de la fila mantiene compatibilidad
+      // con implementaciones anteriores de Apps Script.
+      await sendScriptAction('eliminar',{fila:resolved._row});
+    }
+
+    const deletedRow=Number(resolved._row);
+    let removed=false;
+    allEvents=allEvents.filter(event=>{
+      if(removed) return true;
+      const sameRow=deletedRow&&Number(event._row)===deletedRow;
+      if(sameRow&&sameEventIdentity(event,resolved)){
+        removed=true;
+        return false;
+      }
+      return true;
+    });
+    closeDeleteModal();
+    updateHeaderStats();
+    buildTabs();
+    render();
+    haptic(28);
+    showToast('✓ Actividad eliminada');
+    scheduleRefresh();
+  }catch(error){
+    message.textContent=`⚠️ ${error.message||'No fue posible eliminar la actividad.'}`;
+  }finally{
+    button.disabled=false;
+    button.textContent='Sí, eliminar actividad';
+  }
 });
 
 function sendScriptAction(action,params={}) {
@@ -1598,6 +1830,9 @@ document.addEventListener('keydown',event=>{
   if(timePickerModal.classList.contains('open')) { closeTimePicker(); return; }
   if(activityModal.classList.contains('open')) closeActivityModal();
   if(deleteModal.classList.contains('open')) closeDeleteModal();
+  if(createChoiceModal?.classList.contains('open')) closeCreateChoiceModal();
+  if(holidayModal?.classList.contains('open')) closeHolidayModal();
+  if(holidayDeleteModal?.classList.contains('open')) closeHolidayDeleteModal();
 });
 
 
@@ -1771,7 +2006,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => loadData({silent:true}));
 
 ensureChileHolidayYear(new Date().getFullYear());
-ensureChileHolidayYear(new Date().getFullYear()+1);
+syncOfficialChileHolidaysFromSheet();
 loadData();
 
 
