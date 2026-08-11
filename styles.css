@@ -4904,3 +4904,156 @@ html[data-theme="light"] .event-card.hibrida{
     transition:none!important;
   }
 }
+
+/* ==========================================================================
+   Agenda Presidenta 6.0.9 · corrección del resumen ejecutivo
+   ========================================================================== */
+
+.brief-next-heading{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.brief-next-heading strong{
+  min-width:0;
+}
+.brief-next-status{
+  display:inline-flex;
+  align-items:center;
+  flex:0 0 auto;
+  min-height:20px;
+  padding:3px 6px;
+  border-radius:999px;
+  font-size:8px;
+  line-height:1;
+  font-weight:850;
+  letter-spacing:.015em;
+  white-space:nowrap;
+}
+.brief-next-status.is-pending{
+  color:#f0c36b;
+  border:1px solid color-mix(in srgb,var(--v5-amber) 50%,var(--v5-line));
+  background:color-mix(in srgb,var(--v5-amber) 11%,var(--v5-card));
+}
+.brief-next-status.is-confirm{
+  color:#c9bbeb;
+  border:1px solid color-mix(in srgb,var(--v5-purple) 50%,var(--v5-line));
+  background:color-mix(in srgb,var(--v5-purple) 10%,var(--v5-card));
+}
+html[data-theme="light"] .brief-next-status.is-pending{
+  color:#825d19;
+  background:#fff7e8;
+}
+html[data-theme="light"] .brief-next-status.is-confirm{
+  color:#65568d;
+  background:#f6f2ff;
+}
+
+/* Ningún aviso del resumen puede escapar de su contenedor. */
+.executive-brief,
+.brief-copy,
+.brief-signals,
+.brief-signal,
+.brief-signal-copy,
+.brief-signal-detail{
+  min-width:0!important;
+}
+.brief-signals{
+  max-width:100%!important;
+}
+.brief-signal{
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+.brief-signal-detail>span{
+  min-width:0!important;
+}
+
+/* Móvil: la próxima actividad ocupa toda la línea.
+   Los avisos realmente adicionales bajan a otra línea; nunca quedan
+   parcialmente visibles a la derecha. */
+@media(max-width:759px){
+  .brief-signals{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    width:100%!important;
+    max-width:100%!important;
+    overflow:hidden!important;
+    margin-right:0!important;
+    padding-right:0!important;
+    gap:6px!important;
+  }
+  .brief-signal{
+    max-width:100%!important;
+    overflow:hidden!important;
+  }
+  .brief-signal.next{
+    flex:1 1 100%!important;
+    width:100%!important;
+    max-width:100%!important;
+  }
+  .brief-signal:not(.next){
+    flex:0 1 auto!important;
+    width:auto!important;
+    max-width:100%!important;
+  }
+  .brief-signal.next{
+    grid-template-columns:8px minmax(0,1fr) auto!important;
+  }
+  .brief-next-heading{
+    gap:5px!important;
+  }
+  .brief-next-heading strong{
+    font-size:10px!important;
+  }
+  .brief-next-status{
+    min-height:19px;
+    padding:3px 5px;
+    font-size:7.8px;
+  }
+  .brief-signal-detail{
+    overflow:hidden!important;
+  }
+  .brief-signal-detail>span{
+    display:block!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    max-width:100%!important;
+  }
+  .brief-signal.next em{
+    max-width:105px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
+
+/* En pantallas especialmente angostas, priorizar hora y tiempo restante. */
+@media(max-width:390px){
+  .brief-signal.next{
+    grid-template-columns:7px minmax(0,1fr) auto!important;
+    gap:6px!important;
+    padding:7px 8px!important;
+  }
+  .brief-next-heading{
+    flex-wrap:wrap;
+    row-gap:3px!important;
+  }
+  .brief-signal.next em{
+    max-width:88px;
+    font-size:9px!important;
+  }
+}
+
+/* Notebook/escritorio: mantener utilidad de señales adicionales sin overflow. */
+@media(min-width:1100px){
+  .brief-signals{
+    min-width:0;
+    overflow:hidden;
+  }
+  .brief-signal.next{
+    min-width:0;
+    max-width:430px!important;
+  }
+}

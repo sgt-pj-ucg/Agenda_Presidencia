@@ -518,14 +518,22 @@ function updateExecutiveBrief(today,todayEvents) {
   document.getElementById('briefSubtitle').textContent=subtitle;
 
   const signals=[];
+  const nextStatus=next?getStatus(next):'';
+  const nextNeedsReview=['Por Confirmar','Pendiente'].includes(nextStatus);
+  const additionalPending=Math.max(0,pending-(nextNeedsReview?1:0));
+  const mixedAbsences=absences.length>0&&absences.length<active.length;
+
   if(holiday) signals.push(`<span class="brief-signal holiday"><strong>Feriado nacional</strong><span>${escapeHTML(holiday.name)}</span></span>`);
   if(next){
     const temporal=eventTemporalMeta(next);
-    signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><span class="brief-signal-copy"><strong>Próxima actividad</strong><span class="brief-signal-detail"><b>${formatTime(next.HORA)}</b><span>${escapeHTML(next.ACTIVIDAD)}</span></span></span><em>${temporal.label}</em></button>`);
+    const statusTag=nextNeedsReview
+      ? `<span class="brief-next-status ${nextStatus==='Pendiente'?'is-pending':'is-confirm'}">${escapeHTML(nextStatus)}</span>`
+      : '';
+    signals.push(`<button class="brief-signal next" type="button" data-brief-action="next"><span class="signal-dot"></span><span class="brief-signal-copy"><span class="brief-next-heading"><strong>Próxima actividad</strong>${statusTag}</span><span class="brief-signal-detail"><b>${formatTime(next.HORA)}</b><span>${escapeHTML(next.ACTIVIDAD)}</span></span></span><em>${temporal.label}</em></button>`);
   }
   if(conflicts.length) signals.push(`<span class="brief-signal warning"><strong>Atención</strong><span>${conflicts.length===1?'Coincidencia horaria':'Coincidencias horarias'}</span></span>`);
-  if(pending) signals.push(`<span class="brief-signal pending"><strong>${pending}</strong><span>${pending===1?'actividad por revisar':'actividades por revisar'}</span></span>`);
-  if(absences.length) signals.push(`<span class="brief-signal absence"><strong>${absences.length}</strong><span>${absences.length===1?'ausencia registrada':'ausencias registradas'}</span></span>`);
+  if(additionalPending) signals.push(`<span class="brief-signal pending"><strong>${additionalPending}</strong><span>${additionalPending===1?'actividad adicional por revisar':'actividades adicionales por revisar'}</span></span>`);
+  if(mixedAbsences) signals.push(`<span class="brief-signal absence"><strong>${absences.length}</strong><span>${absences.length===1?'ausencia registrada':'ausencias registradas'}</span></span>`);
   document.getElementById('briefSignals').innerHTML=signals.join('');
 }
 

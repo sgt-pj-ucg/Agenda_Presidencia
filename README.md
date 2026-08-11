@@ -1,47 +1,35 @@
-# Agenda Presidenta 6.0.8 — Premium Cards
+# Agenda Presidenta 6.0.9 — corrección del resumen ejecutivo
 
-Actualización exclusivamente visual sobre la versión 6.0.7.
+## Error corregido
 
-## Qué cambia
+En móvil podía aparecer a la derecha de la ficha `Próxima actividad` un chip cortado como:
 
-### Modalidades
-Se reemplazan los símbolos circulares por iconografía SVG moderna:
+`1 activid…`
 
-- Presencial: edificio institucional
-- Telemática: videoconferencia
-- Híbrida: dos entornos conectados
+Ese chip correspondía al contador de actividades con estado `Pendiente` o `Por Confirmar`.
 
-Los íconos se muestran tanto en la banda superior como en el badge de modalidad.
+En el caso observado era redundante, porque la única actividad pendiente era precisamente la próxima actividad y su estado ya aparecía en la tarjeta principal.
 
-### Tarjetas
-Las tarjetas ahora tienen:
+## Nuevo comportamiento
 
-- borde completo teñido según modalidad;
-- franja lateral de 5 px;
-- sombra suave de dos niveles;
-- ligero brillo interior;
-- fondos tintados muy sutiles;
-- mayor separación vertical;
-- interacción de presión/hover discreta.
+- Si la próxima actividad está `Pendiente` o `Por Confirmar`, el estado se muestra dentro de la propia ficha `Próxima actividad`.
+- No se crea un contador adicional por esa misma actividad.
+- Si existen otras actividades pendientes además de la próxima, se informa únicamente la cantidad adicional.
+- Una ausencia no genera un chip redundante cuando toda la jornada corresponde a ausencia.
+- Las coincidencias horarias continúan mostrándose porque son una alerta relevante.
 
-La modalidad Híbrida mantiene su franja degradada violeta/teal.
+## Protección contra textos cortados
 
-### Legibilidad
-Se aumentó el tamaño de:
+En móvil:
 
-- Presencial / Telemática / Híbrida
-- badges
-- estado
-- hora
-- título de actividad
-- etiqueta Próxima / Finalizada
-- señales del resumen ejecutivo
-- textos pequeños de encabezado
-- textos auxiliares de feriados
+- la ficha `Próxima actividad` ocupa el ancho completo;
+- los avisos adicionales saltan a una nueva línea;
+- se eliminó el desbordamiento horizontal del bloque;
+- ningún chip puede quedar parcialmente visible fuera de la tarjeta.
 
-Las actividades finalizadas siguen atenuadas, pero mucho menos que antes.
+También se revisó el comportamiento para pantallas especialmente angostas y para notebook.
 
-## Sin cambios funcionales
+## Sin cambios de backend
 
 No se modificaron:
 
@@ -50,23 +38,8 @@ No se modificaron:
 - Apps Script
 - feriados
 - voz
-- selector de hora
 - calendario
-- eliminación y edición
-- navegación móvil
-- vista notebook
+- edición/eliminación
+- selector de hora
 
-## Publicación
-
-Reemplaza en GitHub:
-
-- index.html
-- styles.css
-- app.js
-- service-worker.js
-
-También puedes subir el paquete completo para mantener todos los archivos sincronizados.
-
-No es necesario volver a desplegar Code.gs.
-
-Después de publicar, cierra completamente la PWA y vuelve a abrirla para renovar la caché.
+Solo debes actualizar los archivos web en GitHub.
