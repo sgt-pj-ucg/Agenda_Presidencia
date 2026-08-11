@@ -1,58 +1,72 @@
-# Agenda Presidenta 6.0.6 — administración de feriados
+# Agenda Presidenta 6.0.8 — Premium Cards
 
-## Política
+Actualización exclusivamente visual sobre la versión 6.0.7.
 
-- Los feriados nacionales oficiales de 2026 permanecen incorporados y protegidos.
-- 2027 y años siguientes se incorporan cuando exista confirmación oficial.
-- Los feriados regionales y electorales no se agregan automáticamente.
-- Cualquier feriado extraordinario puede registrarse manualmente desde la aplicación.
+## Qué cambia
 
-## Botón +
+### Modalidades
+Se reemplazan los símbolos circulares por iconografía SVG moderna:
 
-El botón central ahora abre:
+- Presencial: edificio institucional
+- Telemática: videoconferencia
+- Híbrida: dos entornos conectados
 
-- Nueva actividad
-- Agregar feriado
+Los íconos se muestran tanto en la banda superior como en el badge de modalidad.
 
-## Formulario de feriado
+### Tarjetas
+Las tarjetas ahora tienen:
 
-Permite registrar:
+- borde completo teñido según modalidad;
+- franja lateral de 5 px;
+- sombra suave de dos niveles;
+- ligero brillo interior;
+- fondos tintados muy sutiles;
+- mayor separación vertical;
+- interacción de presión/hover discreta.
 
-- Fecha
-- Nombre oficial
-- Tipo: nacional, regional o electoral
-- Alcance
-- Fuente oficial o referencia
+La modalidad Híbrida mantiene su franja degradada violeta/teal.
 
-Los registros se guardan en la pestaña `FERIADOS_CHILE`.
+### Legibilidad
+Se aumentó el tamaño de:
 
-## Editar y eliminar
+- Presencial / Telemática / Híbrida
+- badges
+- estado
+- hora
+- título de actividad
+- etiqueta Próxima / Finalizada
+- señales del resumen ejecutivo
+- textos pequeños de encabezado
+- textos auxiliares de feriados
 
-Los feriados agregados manualmente pueden editarse o eliminarse al seleccionar el día en el calendario.
+Las actividades finalizadas siguen atenuadas, pero mucho menos que antes.
 
-Los feriados del calendario oficial 2026 muestran `Oficial protegido` y no pueden modificarse desde la app.
+## Sin cambios funcionales
 
-## Proceso recomendado cada diciembre
+No se modificaron:
 
-Cuando Gobierno de Chile publique oficialmente los feriados del año siguiente:
+- Google Sheet
+- Code.gs
+- Apps Script
+- feriados
+- voz
+- selector de hora
+- calendario
+- eliminación y edición
+- navegación móvil
+- vista notebook
 
-1. revisar la publicación oficial;
-2. agregar mediante `+ > Agregar feriado` únicamente los feriados nacionales;
-3. registrar el nombre oficial y, de ser posible, la fuente;
-4. agregar regionales o electorales solo manualmente si corresponden.
+## Publicación
 
-## Instalación técnica
+Reemplaza en GitHub:
 
-### GitHub
-Reemplazar:
 - index.html
 - styles.css
 - app.js
 - service-worker.js
-- manifest.webmanifest
-- carpeta icons/
 
-### Apps Script
-Reemplazar el código por `Code.gs` y actualizar la implementación existente.
+También puedes subir el paquete completo para mantener todos los archivos sincronizados.
 
-No cambies la URL de Apps Script si actualizas la misma implementación.
+No es necesario volver a desplegar Code.gs.
+
+Después de publicar, cierra completamente la PWA y vuelve a abrirla para renovar la caché.

@@ -1,5 +1,5 @@
 
-// Agenda Presidencia · administración manual de feriados y calendario oficial controlado
+// Agenda Presidencia · revisión automática de feriados nacionales oficiales
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
@@ -232,7 +232,7 @@ function setHolidayYear(year,items,{replace=false}={}){
   items.forEach(item=>{
     const canonical=normalizeDateKey(item.date);
     if(!canonical) return;
-    existing.set(canonical,{
+    const incoming={
       date:canonical,
       name:normalizedHolidayName(item.name),
       type:item.type||'Feriado nacional',
@@ -242,7 +242,10 @@ function setHolidayYear(year,items,{replace=false}={}){
       source:item.source||'Calendario oficial',
       _row:Number(item._row)||0,
       protected:Boolean(item.protected)
-    });
+    };
+    const current=existing.get(canonical);
+    if(current?.protected&&!incoming.protected) return;
+    existing.set(canonical,incoming);
   });
   chileHolidayYears.set(year,existing);
 }
@@ -391,12 +394,26 @@ function haptic(pattern=18){
   try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(_){ }
 }
 
+function modalityIconSvg(modality){
+  const common='class="modality-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  if(modality==='Presencial'){
+    return `<svg ${common}><path d="M3.5 9.5 12 4l8.5 5.5"/><path d="M5 10.5h14M6.5 10.5V18M10 10.5V18M14 10.5V18M17.5 10.5V18M4 20h16"/></svg>`;
+  }
+  if(modality==='Telemática'){
+    return `<svg ${common}><rect x="3" y="5.5" width="13.5" height="13" rx="2.5"/><path d="m16.5 10 4.5-2.5v9L16.5 14"/><path d="M7.5 9.5h4.5M7.5 13h3"/></svg>`;
+  }
+  if(modality==='Híbrida'){
+    return `<svg ${common}><rect x="3" y="5" width="8" height="7" rx="1.8"/><rect x="13" y="12" width="8" height="7" rx="1.8"/><path d="M7 12v3.2c0 .9.7 1.6 1.6 1.6H13M17 12V8.8c0-.9-.7-1.6-1.6-1.6H11"/><path d="m10.3 6.1.7 1.1-.7 1.1M13.7 15.7l-.7 1.1.7 1.1"/></svg>`;
+  }
+  return `<svg ${common}><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>`;
+}
+
 function modalityMeta(value) {
   const modality=normalizeModality(value);
-  if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:'●',label:'Presencial'};
-  if (modality==='Telemática') return {className:'telematica',badge:'b-telematica',icon:'◉',label:'Telemática'};
-  if (modality==='Híbrida') return {className:'hibrida',badge:'b-hibrida',icon:'◐',label:'Híbrida'};
-  return {className:'otro',badge:'b-otro',icon:'•',label:'Otra modalidad'};
+  if (modality==='Presencial') return {className:'presencial',badge:'b-presencial',icon:modalityIconSvg(modality),label:'Presencial'};
+  if (modality==='Telemática') return {className:'telematica',badge:'b-telematica',icon:modalityIconSvg(modality),label:'Telemática'};
+  if (modality==='Híbrida') return {className:'hibrida',badge:'b-hibrida',icon:modalityIconSvg(modality),label:'Híbrida'};
+  return {className:'otro',badge:'b-otro',icon:modalityIconSvg('Otro'),label:'Otra modalidad'};
 }
 
 function statusEmoji(status) {
@@ -523,7 +540,7 @@ function renderCard(event) {
     : temporal.state==='past'?`<span class="temporal-badge past">Finalizada</span>`:'';
   const banner=special
     ? `<div class="mode-banner mode-special"><span>AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</span>${temporalBadge}</div>`
-    : `<div class="mode-banner mode-${modality.className}"><span class="mode-copy"><span class="mode-icon">${modality.icon}</span> ${modality.label}</span>${temporalBadge}</div>`;
+    : `<div class="mode-banner mode-${modality.className}"><span class="mode-copy"><span class="mode-icon">${modality.icon}</span><span>${modality.label}</span></span>${temporalBadge}</div>`;
   return `
     <article class="event-card ${modality.className} ${special?'special':''} ${status==='Cancelada'?'cancelada':''} ${temporal.state?`temporal-${temporal.state}`:''}" data-key="${key}" data-row="${event._row||''}">
       ${banner}
@@ -532,7 +549,7 @@ function renderCard(event) {
         <div class="card-body">
           <div class="card-title">${escapeHTML(event.ACTIVIDAD)}</div>
           <div class="card-badges">
-            <span class="badge ${modality.badge}">${modality.icon} ${escapeHTML(normalizeModality(event.MODALIDAD))}</span>
+            <span class="badge ${modality.badge}"><span class="badge-modality-icon">${modality.icon}</span><span>${escapeHTML(normalizeModality(event.MODALIDAD))}</span></span>
             ${event.LUGAR?`<span class="badge b-lugar">🏛 ${escapeHTML(event.LUGAR)}</span>`:''}
             ${event.PARTICIPANTES?`<span class="badge b-personas">👥 ${escapeHTML(event.PARTICIPANTES)}</span>`:''}
           </div>
