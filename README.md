@@ -1,45 +1,57 @@
-# Agenda Presidenta 6.0.9 — corrección del resumen ejecutivo
+# Agenda Presidenta 6.0.10 — corrección de formato de Google Sheets
 
-## Error corregido
+## Problema reportado
 
-En móvil podía aparecer a la derecha de la ficha `Próxima actividad` un chip cortado como:
+Al editar una actividad desde PC podía aparecer:
 
-`1 activid…`
+`No puedes configurar el formato de número de las celdas de una columna con texto.`
 
-Ese chip correspondía al contador de actividades con estado `Pendiente` o `Por Confirmar`.
+El problema no estaba en la vista PC. Provenía de `Code.gs`.
 
-En el caso observado era redundante, porque la única actividad pendiente era precisamente la próxima actividad y su estado ya aparecía en la tarjeta principal.
+## Causa
 
-## Nuevo comportamiento
+Después de crear o editar un registro, el backend guardaba correctamente los
+datos y luego ejecutaba `setNumberFormat('dd/MM/yyyy')` sobre FECHA.
 
-- Si la próxima actividad está `Pendiente` o `Por Confirmar`, el estado se muestra dentro de la propia ficha `Próxima actividad`.
-- No se crea un contador adicional por esa misma actividad.
-- Si existen otras actividades pendientes además de la próxima, se informa únicamente la cantidad adicional.
-- Una ausencia no genera un chip redundante cuando toda la jornada corresponde a ausencia.
-- Las coincidencias horarias continúan mostrándose porque son una alerta relevante.
+Si Google Sheets tiene esa columna definida como texto, el dato puede quedar
+guardado y, a continuación, la operación de formato falla. La aplicación recibe
+entonces un mensaje de error aunque la escritura ya se haya realizado.
 
-## Protección contra textos cortados
+Se localizaron 7 operaciones de este tipo en el backend:
 
-En móvil:
+- creación de actividad;
+- edición de actividad;
+- creación de feriado;
+- edición de feriado;
+- actualización/importación de feriados oficiales;
+- creación de nuevas filas de feriados oficiales;
+- formato de la columna FECHA al crear `FERIADOS_CHILE`.
 
-- la ficha `Próxima actividad` ocupa el ancho completo;
-- los avisos adicionales saltan a una nueva línea;
-- se eliminó el desbordamiento horizontal del bloque;
-- ningún chip puede quedar parcialmente visible fuera de la tarjeta.
+## Corrección
 
-También se revisó el comportamiento para pantallas especialmente angostas y para notebook.
+Se eliminaron las 7 operaciones de formato forzado.
 
-## Sin cambios de backend
+Las fechas continúan normalizándose como `dd/MM/yyyy`, y la aplicación sigue
+interpretándolas y ordenándolas correctamente.
 
-No se modificaron:
+La corrección cubre:
 
-- Google Sheet
-- Code.gs
-- Apps Script
-- feriados
-- voz
-- calendario
-- edición/eliminación
-- selector de hora
+- crear actividades;
+- editar actividades;
+- crear/editar feriados;
+- actualización automática de feriados oficiales.
 
-Solo debes actualizar los archivos web en GitHub.
+Esto evita también el riesgo de que una creación se guarde, muestre un falso
+error y el usuario vuelva a intentarla generando un duplicado.
+
+## Instalación
+
+Esta corrección es de backend.
+
+1. Abra Google Apps Script de Agenda Presidenta.
+2. Reemplace el contenido por el `Code.gs` de esta versión.
+3. Actualice la implementación existente.
+
+Mantenga la misma URL `/exec`.
+
+No es necesario cambiar archivos de GitHub para esta corrección.

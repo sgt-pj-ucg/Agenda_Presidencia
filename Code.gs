@@ -87,7 +87,6 @@ function createEvent_(sheet, params) {
 
   copyPreviousRowFormat_(sheet, nextRow);
   sheet.getRange(nextRow, 1, 1, COLUMN_COUNT).setValues([buildRow_(params)]);
-  sheet.getRange(nextRow, 1).setNumberFormat('dd/MM/yyyy');
 
   SpreadsheetApp.flush();
   return { ok: true, action: 'nueva', row: nextRow };
@@ -112,7 +111,6 @@ function updateEvent_(sheet, params) {
   }, true);
 
   sheet.getRange(row, 1, 1, COLUMN_COUNT).setValues([buildRow_(params)]);
-  sheet.getRange(row, 1).setNumberFormat('dd/MM/yyyy');
 
   SpreadsheetApp.flush();
   return { ok: true, action: 'editar', row: row };
@@ -125,6 +123,16 @@ function deleteEvent_(sheet, params) {
   return { ok: true, action: 'eliminar', row: row };
 }
 
+/**
+ * FECHA se guarda como valor normalizado dd/MM/yyyy sin forzar
+ * setNumberFormat().
+ *
+ * Motivo: la planilla institucional puede tener la columna FECHA definida
+ * explícitamente como texto. Google Sheets rechaza setNumberFormat() sobre
+ * una columna tipada como texto, aunque la escritura del dato ya haya sido
+ * exitosa. La aplicación trabaja con getDisplayValues() y normaliza fechas,
+ * por lo que no necesita imponer un formato numérico a la celda.
+ */
 function buildRow_(params) {
   return [
     normalizeDate_(params.fecha),
@@ -226,6 +234,10 @@ function getHolidays_() {
   return { ok: true, action: 'feriados', feriados: holidays };
 }
 
+/**
+ * Los feriados utilizan el mismo criterio: FECHA se conserva como valor
+ * legible dd/MM/yyyy y no se fuerza ningún formato numérico de la celda.
+ */
 function createHoliday_(params) {
   validateRequired_(params, ['fecha', 'nombre']);
   const sheet = ensureHolidaySheet_();
@@ -241,7 +253,6 @@ function createHoliday_(params) {
 
   const row = Math.max(sheet.getLastRow() + 1, 2);
   sheet.getRange(row, 1, 1, HOLIDAY_COLUMN_COUNT).setValues([[date, name, type, scope, 'Sí', source]]);
-  sheet.getRange(row, 1).setNumberFormat('dd/MM/yyyy');
   SpreadsheetApp.flush();
   return { ok: true, action: 'feriado_nuevo', row: row };
 }
@@ -264,7 +275,6 @@ function updateHoliday_(params) {
   const source = clean_(params.fuente) || 'Registro manual desde Agenda Presidenta';
 
   sheet.getRange(row, 1, 1, HOLIDAY_COLUMN_COUNT).setValues([[date, name, type, scope, 'Sí', source]]);
-  sheet.getRange(row, 1).setNumberFormat('dd/MM/yyyy');
   SpreadsheetApp.flush();
   return { ok: true, action: 'feriado_editar', row: row };
 }
@@ -715,7 +725,6 @@ function upsertOfficialNationalHolidays_(sheet, holidays, year, sourceUrl) {
         'Sí',
         source
       ]]);
-      sheet.getRange(rowNumber, 1).setNumberFormat('dd/MM/yyyy');
     } else {
       const newRow = Math.max(sheet.getLastRow() + 1, 2);
       sheet.getRange(newRow, 1, 1, HOLIDAY_COLUMN_COUNT).setValues([[
@@ -726,7 +735,6 @@ function upsertOfficialNationalHolidays_(sheet, holidays, year, sourceUrl) {
         'Sí',
         source
       ]]);
-      sheet.getRange(newRow, 1).setNumberFormat('dd/MM/yyyy');
       dateToRow[date] = newRow;
     }
   });
@@ -832,7 +840,6 @@ function ensureHolidaySheet_() {
   sheet.getRange(1, 1, 1, HOLIDAY_COLUMN_COUNT).setValues(headers);
   sheet.getRange(2, 1, official2026.length, HOLIDAY_COLUMN_COUNT).setValues(official2026);
   sheet.setFrozenRows(1);
-  sheet.getRange('A:A').setNumberFormat('dd/MM/yyyy');
   sheet.autoResizeColumns(1, HOLIDAY_COLUMN_COUNT);
 
   return sheet;
