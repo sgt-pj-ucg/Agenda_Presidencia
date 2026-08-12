@@ -998,6 +998,7 @@ function setActivityTime(value=''){
 }
 
 function resetActivityForm() {
+  hideVoiceCreatePreview();
   ['fActividad','fLugar','fParticipantes'].forEach(id=>document.getElementById(id).value='');
   setActivityTime('');
   document.getElementById('fModalidad').value='Presencial';
@@ -1043,6 +1044,63 @@ document.getElementById('btnCloseActivityModal').addEventListener('click',closeA
 
 activityModal.addEventListener('click',event=>{if(event.target===activityModal)closeActivityModal();});
 
+
+
+function hideVoiceCreatePreview(){
+  const preview=document.getElementById('voiceCreatePreview');
+  if(preview) preview.hidden=true;
+}
+function voiceValueLabel(label,value){
+  return value?`<span class="voice-preview-chip"><b>${escapeHTML(label)}</b>${escapeHTML(value)}</span>`:'';
+}
+function showVoiceCreatePreview(parsed){
+  const preview=document.getElementById('voiceCreatePreview');
+  const chips=document.getElementById('voicePreviewChips');
+  const transcript=document.getElementById('voicePreviewTranscript');
+  if(!preview||!chips||!transcript)return;
+  const d=parsed.data||{};
+  chips.innerHTML=[
+    voiceValueLabel('Actividad',d.ACTIVIDAD),
+    voiceValueLabel('Fecha',d.FECHA),
+    voiceValueLabel('Hora',d.HORA||'Sin hora'),
+    voiceValueLabel('Modalidad',d.MODALIDAD),
+    voiceValueLabel('Lugar',d.LUGAR),
+    voiceValueLabel('Participantes',d.PARTICIPANTES),
+    voiceValueLabel('Estado',d.ESTADO)
+  ].filter(Boolean).join('');
+  transcript.textContent=`“${parsed.raw||''}”`;
+  preview.hidden=false;
+}
+function applyVoiceCreateResult(parsed){
+  if(!parsed||parsed.intent!=='create'){
+    showToast('No pude interpretar el dictado como una nueva actividad.');
+    return false;
+  }
+  openActivityModal('add');
+  const d=parsed.data||{};
+  document.getElementById('fFecha').value=d.FECHA?dateToInput(d.FECHA):'';
+  setActivityTime(d.HORA||'');
+  document.getElementById('fActividad').value=d.ACTIVIDAD||'';
+  document.getElementById('fModalidad').value=normalizeModality(d.MODALIDAD||'Presencial');
+  document.getElementById('fEstado').value=normalizeStatus(d.ESTADO||'Por Confirmar');
+  document.getElementById('fLugar').value=d.LUGAR||'';
+  document.getElementById('fParticipantes').value=d.PARTICIPANTES||'';
+  showVoiceCreatePreview(parsed);
+
+  const missing=(parsed.missing||[]).map(item=>item==='fecha'?'fecha obligatoria':item==='detalle'?'nombre de actividad obligatorio':item);
+  const issues=[...missing,...(parsed.warnings||[])];
+  document.getElementById('formMsg').textContent=issues.length
+    ? `⚠️ Revise antes de guardar: ${issues.join(' · ')}`
+    : '✓ Dictado interpretado. Revise cada campo y pulse Guardar actividad.';
+  return true;
+}
+function parseAndPreviewVoiceActivity(text){
+  if(!window.AgendaVoiceCreate){
+    showToast('El intérprete de voz no está disponible.');
+    return false;
+  }
+  return applyVoiceCreateResult(window.AgendaVoiceCreate.parse(text,{now:new Date(),forceCreate:true}));
+}
 
 function openCreateChoiceModal(){
   createChoiceModal?.classList.add('open');
@@ -1368,7 +1426,7 @@ document.getElementById('btnGuardar').addEventListener('click',async()=>{
       allEvents.push({...data,_row:Number(result.row)||tempRow});
       haptic([18,35,18]); showToast('✓ Actividad creada');
     }
-    closeActivityModal(); updateHeaderStats(); buildTabs(); render(); scheduleRefresh();
+    closeActivityModal(); updateHeaderStats(); buildTabs(); render(); scheduleActivityReminders(); sweepDueReminders(); scheduleRefresh();
   } catch (error) {
     message.textContent=`⚠️ ${error.message||'No fue posible sincronizar con la planilla.'}`;
   } finally {
@@ -1672,6 +1730,21 @@ document.getElementById('clearSearch').addEventListener('click',()=>{searchInput
 const activityVoiceBtn=document.getElementById('activityVoiceBtn');
 const activityVoiceHint=document.getElementById('activityVoiceHint');
 const voiceBtn=document.getElementById('voiceBtn');
+const createVoiceChoice=document.getElementById('createVoiceChoice');
+const voiceRedictateButton=document.getElementById('voiceRedictateButton');
+const voiceCaptureModal=document.getElementById('voiceCaptureModal');
+const voiceCaptureStage=document.getElementById('voiceCaptureStage');
+const voiceCaptureStatus=document.getElementById('voiceCaptureStatus');
+const voiceCaptureElapsed=document.getElementById('voiceCaptureElapsed');
+const voiceCaptureProgress=document.getElementById('voiceCaptureProgress');
+const voiceCaptureTranscript=document.getElementById('voiceCaptureTranscript');
+const voiceHoldButton=document.getElementById('voiceHoldButton');
+const voiceHoldLabel=document.getElementById('voiceHoldLabel');
+const voiceHoldHint=document.getElementById('voiceHoldHint');
+const voiceLiveHint=document.getElementById('voiceLiveHint');
+const btnVoiceHandsFree=document.getElementById('btnVoiceHandsFree');
+const btnVoiceCaptureCancel=document.getElementById('btnVoiceCaptureCancel');
+const btnCloseVoiceCapture=document.getElementById('btnCloseVoiceCapture');
 const SpeechRecognitionAPI=window.SpeechRecognition||window.webkitSpeechRecognition;
 const speechUA=navigator.userAgent||'';
 const speechIsIOS=/iPad|iPhone|iPod/.test(speechUA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -1809,8 +1882,156 @@ function createSpeechController({button,onPending,onListening,onTranscript,onErr
   return {start,stop,isActive:()=>state!=='idle'};
 }
 
+
+function formatVoiceElapsed(ms){
+  const seconds=Math.max(0,Math.floor(ms/1000));
+  return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+}
+function setVoiceDetected(field,value,detected=false){
+  const item=document.querySelector(`[data-voice-field="${field}"]`);
+  if(!item)return;
+  item.classList.toggle('detected',Boolean(detected));
+  const strong=item.querySelector('strong');
+  if(strong)strong.textContent=value||'—';
+}
+function updateVoiceCaptureAnalysis(text){
+  const clean=String(text||'').trim();
+  voiceCaptureTranscript.textContent=clean||'Mantenga pulsado y diga la actividad completa. Puede hablar con pausas.';
+  if(!clean||!window.AgendaVoiceCreate){
+    setVoiceDetected('actividad','—',false);
+    setVoiceDetected('fecha','—',false);
+    setVoiceDetected('hora','—',false);
+    setVoiceDetected('modalidad','Presencial',false);
+    setVoiceDetected('lugar','—',false);
+    setVoiceDetected('estado','Por Confirmar',false);
+    setVoiceDetected('personas','—',false);
+    return;
+  }
+  const parsed=window.AgendaVoiceCreate.parse(clean,{now:new Date(),forceCreate:true});
+  const d=parsed.data||{},meta=parsed.meta||{};
+  setVoiceDetected('actividad',d.ACTIVIDAD||'—',Boolean(d.ACTIVIDAD));
+  setVoiceDetected('fecha',d.FECHA||'—',Boolean(parsed.detected?.date));
+  setVoiceDetected('hora',meta.explicitNoTime?'Sin hora':(d.HORA||'—'),Boolean(parsed.detected?.time||meta.explicitNoTime));
+  setVoiceDetected('modalidad',d.MODALIDAD||'Presencial',Boolean(parsed.detected?.modality||meta.inferredModality));
+  setVoiceDetected('lugar',d.LUGAR||'—',Boolean(parsed.detected?.location));
+  setVoiceDetected('estado',d.ESTADO||'Por Confirmar',Boolean(parsed.detected?.status));
+  setVoiceDetected('personas',d.PARTICIPANTES||meta.people||'—',Boolean(parsed.detected?.people));
+}
+function setVoiceHoldVisual(active){
+  voiceHoldButton?.classList.toggle('is-pressed',Boolean(active));
+  voiceCaptureStage?.classList.toggle('is-held',Boolean(active));
+  if(voiceHoldLabel)voiceHoldLabel.textContent=active?'ESCUCHANDO · SUELTE AL TERMINAR':'MANTENGA PULSADO PARA HABLAR';
+  if(voiceHoldHint)voiceHoldHint.textContent=active?'Puede hablar con calma y hacer pausas':'Suelte cuando haya terminado';
+  if(voiceLiveHint)voiceLiveHint.textContent=active?'Puede seguir hablando':'Aparecerá mientras habla';
+}
+function syncVoiceHandsFreeButton(){
+  if(!btnVoiceHandsFree)return;
+  const active=voiceCaptureMode==='handsfree'&&(voiceCaptureSession?.isActive?.()||voiceCaptureSession?.isFinishing?.());
+  btnVoiceHandsFree.classList.toggle('is-active',active);
+  btnVoiceHandsFree.textContent=active?'Terminar y revisar':'Manos libres';
+  btnVoiceHandsFree.setAttribute('aria-pressed',active?'true':'false');
+}
+function setVoiceCaptureState(state,detail=''){
+  if(!voiceCaptureStage)return;
+  voiceCaptureStage.className=`voice-capture-stage is-${state}${voiceHoldButton?.classList.contains('is-pressed')?' is-held':''}`;
+  const labels={
+    ready:'Lista para escuchar',
+    starting:'Activando micrófono…',
+    listening:voiceCaptureMode==='hold'?'Escuchando activamente':'Escuchando en modo manos libres',
+    waiting:'Sigo escuchando — puede continuar',
+    restarting:'Reconectando escucha…',
+    processing:'Interpretando la actividad…',
+    error:'No fue posible continuar',
+    idle:'Listo'
+  };
+  voiceCaptureStatus.textContent=detail||labels[state]||labels.ready;
+}
+function resetVoiceCaptureUI(){
+  voiceCaptureMode='hold';
+  voiceCaptureSession?.cancel?.();
+  voiceCaptureSession=null;
+  setVoiceHoldVisual(false);
+  syncVoiceHandsFreeButton();
+  voiceCaptureElapsed.textContent='00:00';
+  voiceCaptureProgress.style.width='0%';
+  updateVoiceCaptureAnalysis('');
+  setVoiceCaptureState('ready');
+}
+function closeVoiceCapture({cancel=true}={}){
+  if(cancel)voiceCaptureSession?.cancel?.();
+  voiceCaptureSession=null;
+  voiceCaptureMode='hold';
+  setVoiceHoldVisual(false);
+  syncVoiceHandsFreeButton();
+  voiceCaptureModal?.classList.remove('open');
+  document.body.classList.remove('voice-capture-open');
+}
+function openVoiceStudio(){
+  if(!SpeechRecognitionAPI){showToast('El reconocimiento de voz no está disponible en este navegador.');return;}
+  if(speechIsIOSAlternative&&!speechIsStandalone){showToast('En iPhone, use Safari o la aplicación instalada para crear por voz.');return;}
+  if(!window.AgendaLongVoiceSession||!window.AgendaPressToTalk){showToast('No fue posible cargar el modo de agendamiento por voz.');return;}
+  closeCreateChoiceModal();
+  resetVoiceCaptureUI();
+  voiceCaptureModal?.classList.add('open');
+  document.body.classList.add('voice-capture-open');
+  setTimeout(()=>voiceHoldButton?.focus({preventScroll:true}),140);
+}
+function buildVoiceCaptureSession(){
+  return window.AgendaLongVoiceSession.create({
+    Recognition:SpeechRecognitionAPI,
+    lang:'es-CL',
+    maxMs:120000,
+    restartDelay:260,
+    finishGraceMs:950,
+    onState:(state,detail)=>{setVoiceCaptureState(state,detail==='no-speech'?'Sigo escuchando — puede continuar':'');syncVoiceHandsFreeButton();},
+    onTranscript:text=>updateVoiceCaptureAnalysis(text),
+    onTick:(elapsed,max)=>{
+      voiceCaptureElapsed.textContent=formatVoiceElapsed(elapsed);
+      voiceCaptureProgress.style.width=`${Math.min(100,(elapsed/max)*100)}%`;
+      if(max-elapsed<15000&&max-elapsed>0&&voiceCaptureSession?.isActive?.()){
+        voiceCaptureStatus.textContent=`Escuchando · quedan ${Math.max(1,Math.ceil((max-elapsed)/1000))} s`;
+      }
+    },
+    onDone:text=>{setVoiceHoldVisual(false);closeVoiceCapture({cancel:false});parseAndPreviewVoiceActivity(text);},
+    onError:message=>{setVoiceHoldVisual(false);voiceCaptureMode='hold';syncVoiceHandsFreeButton();setVoiceCaptureState('error',message);showToast(`⚠️ ${message}`);}
+  });
+}
+function beginVoiceCapture(mode='hold'){
+  if(voiceCaptureSession?.isActive?.()||voiceCaptureSession?.isFinishing?.())return false;
+  voiceCaptureMode=mode;
+  updateVoiceCaptureAnalysis('');
+  voiceCaptureElapsed.textContent='00:00';
+  voiceCaptureProgress.style.width='0%';
+  voiceCaptureSession=buildVoiceCaptureSession();
+  syncVoiceHandsFreeButton();
+  const started=voiceCaptureSession.start();
+  if(!started){voiceCaptureMode='hold';syncVoiceHandsFreeButton();return false;}
+  if(mode==='hold')setVoiceHoldVisual(true);
+  haptic(8);
+  return true;
+}
+function finishVoiceCapture(reason='release'){
+  if(!voiceCaptureSession)return false;
+  setVoiceHoldVisual(false);
+  setVoiceCaptureState('processing');
+  haptic([8,18,8]);
+  return voiceCaptureSession.finish(reason);
+}
+function cancelVoiceHoldAttempt(){
+  if(!voiceCaptureSession?.isActive?.())return;
+  voiceCaptureSession.cancel?.();
+  voiceCaptureSession=null;
+  voiceCaptureMode='hold';
+  setVoiceHoldVisual(false);
+  syncVoiceHandsFreeButton();
+  setVoiceCaptureState('ready','La pulsación se interrumpió. Mantenga pulsado para intentarlo nuevamente.');
+}
+
 let activityDictationRecognition=null;
 let searchSpeechController=null;
+let voiceCaptureSession=null;
+let voiceCaptureMode='hold';
+let voicePressBinding=null;
 
 if(!SpeechRecognitionAPI){
   activityVoiceBtn.disabled=true;
@@ -1819,6 +2040,7 @@ if(!SpeechRecognitionAPI){
   voiceBtn.disabled=true;
   voiceBtn.classList.add('unavailable');
   voiceBtn.title='Voz no disponible en este navegador';
+  if(createVoiceChoice){createVoiceChoice.disabled=true;createVoiceChoice.classList.add('unavailable');}
 }else{
   activityDictationRecognition=createSpeechController({
     button:activityVoiceBtn,
@@ -1847,12 +2069,182 @@ if(!SpeechRecognitionAPI){
 
   activityVoiceBtn.addEventListener('click',()=>activityDictationRecognition.start());
   voiceBtn.addEventListener('click',()=>searchSpeechController.start());
+
+  voicePressBinding=window.AgendaPressToTalk?.bind(voiceHoldButton,{
+    onPress:()=>{if(voiceCaptureMode==='handsfree'&&voiceCaptureSession?.isActive?.())return;beginVoiceCapture('hold');},
+    onRelease:()=>{if(voiceCaptureMode==='hold')finishVoiceCapture('release');},
+    onCancel:()=>cancelVoiceHoldAttempt()
+  });
+  createVoiceChoice?.addEventListener('click',openVoiceStudio);
+  voiceRedictateButton?.addEventListener('click',()=>{closeActivityModal();setTimeout(openVoiceStudio,140);});
+  btnVoiceHandsFree?.addEventListener('click',()=>{
+    if(voiceCaptureMode==='handsfree'&&(voiceCaptureSession?.isActive?.()||voiceCaptureSession?.isFinishing?.())){
+      finishVoiceCapture('handsfree');
+      return;
+    }
+    if(voiceCaptureSession?.isActive?.())return;
+    setVoiceHoldVisual(false);
+    beginVoiceCapture('handsfree');
+  });
+  btnVoiceCaptureCancel?.addEventListener('click',()=>closeVoiceCapture({cancel:true}));
+  btnCloseVoiceCapture?.addEventListener('click',()=>closeVoiceCapture({cancel:true}));
+  voiceCaptureModal?.addEventListener('click',event=>{if(event.target===voiceCaptureModal)closeVoiceCapture({cancel:true});});
 }
 
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='hidden') return;
   activityDictationRecognition?.stop?.();
   searchSpeechController?.stop?.();
+  if(voiceCaptureSession?.isActive?.()||voiceCaptureSession?.isFinishing?.()) closeVoiceCapture({cancel:true});
+});
+
+
+const REMINDER_STORAGE_KEY='agenda-presidenta-reminders-15';
+const REMINDER_SENT_KEY='agenda-presidenta-reminders-sent-v1';
+const REMINDER_MINUTES=15;
+const reminderToggle=document.getElementById('reminderToggle');
+const reminderTimers=new Map();
+
+function remindersEnabled(){
+  return localStorage.getItem(REMINDER_STORAGE_KEY)==='on'&&
+    typeof Notification!=='undefined'&&Notification.permission==='granted';
+}
+function syncReminderToggle(){
+  if(!reminderToggle)return;
+  const on=remindersEnabled();
+  reminderToggle.classList.toggle('active',on);
+  reminderToggle.setAttribute('aria-pressed',on?'true':'false');
+  reminderToggle.title=on?'Recordatorios 15 min activados':'Activar recordatorios 15 min';
+}
+function readSentReminders(){
+  try{return JSON.parse(localStorage.getItem(REMINDER_SENT_KEY)||'{}')||{};}catch{return {};}
+}
+function writeSentReminders(value){
+  try{localStorage.setItem(REMINDER_SENT_KEY,JSON.stringify(value));}catch{}
+}
+function reminderEventKey(event){
+  return [event.FECHA,event.HORA,event.MODALIDAD,event.ACTIVIDAD,event.LUGAR].join('|');
+}
+function eventStartDateTime(event){
+  const date=parseDate(event.FECHA),time=normalizeTimeValue(event.HORA);
+  if(!date||!time)return null;
+  const[hour,minute]=time.split(':').map(Number);
+  return new Date(date.getFullYear(),date.getMonth(),date.getDate(),hour,minute,0,0);
+}
+async function showAgendaNotification(title,body,tag){
+  if(typeof Notification==='undefined'||Notification.permission!=='granted')return false;
+  try{
+    const registration=await navigator.serviceWorker?.ready;
+    if(!registration?.showNotification)return false;
+    await registration.showNotification(title,{
+      body,tag,renotify:false,
+      icon:'icons/icon-192.png',
+      badge:'icons/icon-192.png',
+      data:{url:location.href.split('#')[0]}
+    });
+    return true;
+  }catch(error){
+    console.warn('Notification',error);
+    return false;
+  }
+}
+async function fireActivityReminder(event,{force=false}={}){
+  if(!force&&!remindersEnabled())return false;
+  const start=eventStartDateTime(event);
+  if(!start)return false;
+  const key=reminderEventKey(event),sent=readSentReminders();
+  if(!force&&sent[key])return false;
+  const mins=Math.max(0,Math.round((start-Date.now())/60000));
+  const when=mins>=14?'en 15 minutos':mins>1?`en ${mins} minutos`:mins===1?'en 1 minuto':'ahora';
+  const body=`${formatTime(event.HORA)} · ${event.ACTIVIDAD}${event.LUGAR?` · ${event.LUGAR}`:''}`;
+  const shown=await showAgendaNotification(`Agenda Presidenta · ${when}`,body,`agenda-presidenta-${key}`);
+  if(shown&&!force){
+    sent[key]=Date.now();
+    const cutoff=Date.now()-7*24*60*60*1000;
+    Object.keys(sent).forEach(item=>{if(Number(sent[item])<cutoff)delete sent[item];});
+    writeSentReminders(sent);
+  }
+  return shown;
+}
+function clearReminderTimers(){
+  reminderTimers.forEach(clearTimeout);
+  reminderTimers.clear();
+}
+function scheduleActivityReminders(){
+  clearReminderTimers();
+  if(!remindersEnabled())return;
+  const now=Date.now(),horizon=now+86400000;
+  allEvents.forEach(event=>{
+    const start=eventStartDateTime(event);
+    if(!start||getStatus(event)==='Cancelada')return;
+    const due=start.getTime()-REMINDER_MINUTES*60000;
+    if(due<=now||due>horizon)return;
+    const key=reminderEventKey(event);
+    reminderTimers.set(key,setTimeout(()=>{
+      reminderTimers.delete(key);
+      fireActivityReminder(event);
+    },due-now));
+  });
+}
+async function sweepDueReminders(){
+  if(!remindersEnabled())return;
+  const now=Date.now();
+  for(const event of allEvents){
+    if(getStatus(event)==='Cancelada')continue;
+    const start=eventStartDateTime(event);
+    if(!start)continue;
+    const diff=start-now;
+    if(diff<=REMINDER_MINUTES*60000&&diff>=0)await fireActivityReminder(event);
+  }
+}
+async function enableActivityReminders(){
+  if(typeof Notification==='undefined'||!('serviceWorker'in navigator)){
+    showToast('Este navegador no admite recordatorios de la PWA.');
+    return;
+  }
+  if(speechIsIOS&&!speechIsStandalone){
+    showToast('En iPhone, instale la app en la pantalla de inicio antes de activar avisos.');
+    return;
+  }
+  let permission=Notification.permission;
+  if(permission!=='granted'){
+    try{permission=await Notification.requestPermission();}catch{permission='denied';}
+  }
+  if(permission!=='granted'){
+    localStorage.removeItem(REMINDER_STORAGE_KEY);
+    syncReminderToggle();
+    showToast('No se autorizó el envío de notificaciones.');
+    return;
+  }
+  localStorage.setItem(REMINDER_STORAGE_KEY,'on');
+  syncReminderToggle();
+  scheduleActivityReminders();
+  await showAgendaNotification(
+    'Agenda Presidenta',
+    'Recordatorios activados · aviso 15 minutos antes de cada actividad con hora.',
+    'agenda-presidenta-test'
+  );
+  showToast('🔔 Recordatorios de 15 minutos activados');
+}
+function disableActivityReminders(){
+  localStorage.removeItem(REMINDER_STORAGE_KEY);
+  clearReminderTimers();
+  syncReminderToggle();
+  showToast('Recordatorios desactivados');
+}
+reminderToggle?.addEventListener('click',()=>remindersEnabled()?disableActivityReminders():enableActivityReminders());
+syncReminderToggle();
+setInterval(sweepDueReminders,30000);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    syncReminderToggle();
+    scheduleActivityReminders();
+    sweepDueReminders();
+  }
+});
+window.addEventListener('focus',()=>{
+  scheduleActivityReminders();
+  sweepDueReminders();
 });
 
 function showToast(message) {
@@ -1862,6 +2254,7 @@ function showToast(message) {
 
 document.addEventListener('keydown',event=>{
   if(event.key!=='Escape') return;
+  if(voiceCaptureModal?.classList.contains('open')) { closeVoiceCapture({cancel:true}); return; }
   closeDropdown();
   if(timePickerModal.classList.contains('open')) { closeTimePicker(); return; }
   if(activityModal.classList.contains('open')) closeActivityModal();
@@ -2010,7 +2403,7 @@ async function loadData({silent=false}={}) {
         {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Ausencia de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:6}
       ];
       lastSuccessfulLoadAt=Date.now();
-      updateHeaderStats();buildTabs();render();dismissLaunchScreen();return;
+      updateHeaderStats();buildTabs();render();scheduleActivityReminders();sweepDueReminders();dismissLaunchScreen();return;
     }
 
     const payload=await sendScriptAction('listar');
@@ -2023,6 +2416,8 @@ async function loadData({silent=false}={}) {
     updateHeaderStats();
     buildTabs();
     render();
+    scheduleActivityReminders();
+    sweepDueReminders();
     dismissLaunchScreen();
     if(silent) showToast('↻ Agenda sincronizada');
   } catch(error) {

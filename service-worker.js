@@ -1,9 +1,12 @@
-const CACHE_NAME = 'agenda-presidenta-shell-611';
+const CACHE_NAME = 'agenda-presidenta-shell-610';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=611',
-  './app.js?v=611',
+  './styles.css?v=610',
+  './app.js?v=610',
+  './voice-create.js?v=610',
+  './voice-session.js?v=610',
+  './voice-press.js?v=610',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -57,6 +60,23 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => cached);
       return cached || network;
+    })
+  );
+});
+
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = event.notification?.data?.url || './';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+      for (const client of windows) {
+        if ('focus' in client) {
+          try { client.navigate(target); } catch (_) {}
+          return client.focus();
+        }
+      }
+      return clients.openWindow ? clients.openWindow(target) : undefined;
     })
   );
 });
