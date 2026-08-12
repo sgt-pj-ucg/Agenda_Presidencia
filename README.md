@@ -1,57 +1,95 @@
-# Agenda Presidenta 6.0.10 — corrección de formato de Google Sheets
+# Agenda Presidenta 6.0.11 — sincronización en vivo y edición robusta
 
-## Problema reportado
+## Corrección definitiva de edición
 
-Al editar una actividad desde PC podía aparecer:
+El caso reportado fue reproducido con la actividad:
 
-`No puedes configurar el formato de número de las celdas de una columna con texto.`
+- Fecha: 28/08/2026
+- Actividad: Cena aniversario 177° Corte
+- Fila real: 74
+- Hora original: sin hora
 
-El problema no estaba en la vista PC. Provenía de `Code.gs`.
+Al intentar cambiarla a 15:00, el backend antiguo usaba:
 
-## Causa
+`horaOriginal || horaNueva`
 
-Después de crear o editar un registro, el backend guardaba correctamente los
-datos y luego ejecutaba `setNumberFormat('dd/MM/yyyy')` sobre FECHA.
+Como la hora original era una cadena vacía, terminaba buscando la fila por la
+hora nueva 15:00. Esa hora todavía no existía en Google Sheets y la actividad
+no podía localizarse.
 
-Si Google Sheets tiene esa columna definida como texto, el dato puede quedar
-guardado y, a continuación, la operación de formato falla. La aplicación recibe
-entonces un mensaje de error aunque la escritura ya se haya realizado.
+La versión 6.0.11 conserva expresamente los valores originales vacíos.
 
-Se localizaron 7 operaciones de este tipo en el backend:
+## Lectura y escritura unificadas
 
-- creación de actividad;
-- edición de actividad;
-- creación de feriado;
-- edición de feriado;
-- actualización/importación de feriados oficiales;
-- creación de nuevas filas de feriados oficiales;
-- formato de la columna FECHA al crear `FERIADOS_CHILE`.
+Antes:
 
-## Corrección
+- lectura: CSV publicado de Google Sheets;
+- escritura: Google Apps Script.
 
-Se eliminaron las 7 operaciones de formato forzado.
+Ese diseño podía generar desfases entre móvil, PC, CSV y planilla.
 
-Las fechas continúan normalizándose como `dd/MM/yyyy`, y la aplicación sigue
-interpretándolas y ordenándolas correctamente.
+Desde 6.0.11:
 
-La corrección cubre:
+- lectura: Apps Script `listar`;
+- creación: Apps Script;
+- edición: Apps Script;
+- cambio de estado: Apps Script;
+- eliminación: Apps Script.
 
-- crear actividades;
-- editar actividades;
-- crear/editar feriados;
-- actualización automática de feriados oficiales.
+`listar` devuelve el número real de fila de Google Sheets (`_row`), por lo que
+móvil y PC trabajan sobre la misma fuente en vivo.
 
-Esto evita también el riesgo de que una creación se guarde, muestre un falso
-error y el usuario vuelva a intentarla generando un duplicado.
+## Resolución segura de filas
 
-## Instalación
+La edición intenta:
 
-Esta corrección es de backend.
+1. fila exacta + identidad original;
+2. fecha + hora original + actividad;
+3. como rescate, fecha + actividad solo si existe una única coincidencia.
 
-1. Abra Google Apps Script de Agenda Presidenta.
-2. Reemplace el contenido por el `Code.gs` de esta versión.
-3. Actualice la implementación existente.
+Si hay varias coincidencias, se detiene en lugar de modificar una fila dudosa.
 
-Mantenga la misma URL `/exec`.
+## Estado Ausente
 
-No es necesario cambiar archivos de GitHub para esta corrección.
+La casilla especial de ausencia ahora depende exclusivamente de:
+
+`ESTADO = Ausente`
+
+No se considera ausencia por palabras en ACTIVIDAD ni por MODALIDAD.
+
+Por tanto:
+
+- un curso Confirmado sigue siendo una actividad normal;
+- un feriado escrito como texto no implica ausencia;
+- un permiso escrito en el detalle no implica ausencia;
+- solo el estado Ausente activa el diseño gris azulado de ausencia.
+
+Los feriados nacionales oficiales continúan con su propio diseño rojo,
+independiente del estado de la Presidenta.
+
+## Zona horaria
+
+El backend utiliza explícitamente:
+
+`America/Santiago`
+
+La planilla actualmente tiene una configuración distinta; conviene cambiarla
+también a Santiago en Archivo → Configuración.
+
+## Orden de actualización
+
+IMPORTANTE:
+
+1. primero reemplazar Code.gs y actualizar la implementación existente;
+2. después subir a GitHub los archivos web 6.0.11.
+
+La URL /exec no cambia.
+
+Archivos web que cambian:
+
+- index.html
+- app.js
+- service-worker.js
+
+`styles.css` se mantiene, pero el paquete completo puede subirse para evitar
+mezclar versiones.

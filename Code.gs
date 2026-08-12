@@ -8,6 +8,8 @@ const HOLIDAY_SHEET_NAME = 'FERIADOS_CHILE';
 const FIRST_DATA_ROW = 2;
 const COLUMN_COUNT = 8;
 const HOLIDAY_COLUMN_COUNT = 6;
+const AGENDA_TIME_ZONE = 'America/Santiago';
+const BACKEND_VERSION = '6.0.11';
 const HOLIDAY_REVIEW_HANDLER = 'revisionAutomaticaFeriados';
 const HOLIDAY_REVIEW_START_MONTH = 12;
 const HOLIDAY_REVIEW_END_DAY_JANUARY = 15;
@@ -25,6 +27,12 @@ function doGet(e) {
     let result;
 
     switch (action) {
+      case 'listar': {
+        const sheet = getAgendaSheet_();
+        result = listEvents_(sheet);
+        break;
+      }
+
       case 'feriados':
         result = getHolidays_();
         break;
@@ -66,7 +74,7 @@ function doGet(e) {
       }
 
       case 'ping':
-        result = { ok: true, action: 'ping', message: 'Agenda Presidenta API activa' };
+        result = { ok: true, action: 'ping', version: BACKEND_VERSION, message: 'Agenda Presidenta API activa' };
         break;
 
       default:
@@ -81,11 +89,52 @@ function doGet(e) {
   }
 }
 
+
+function listEvents_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < FIRST_DATA_ROW) {
+    return {
+      ok: true,
+      action: 'listar',
+      schema: 'agenda-live-v1',
+      version: BACKEND_VERSION,
+      eventos: []
+    };
+  }
+
+  const values = sheet
+    .getRange(FIRST_DATA_ROW, 1, lastRow - FIRST_DATA_ROW + 1, COLUMN_COUNT)
+    .getDisplayValues();
+
+  const events = values.map(function(row, index) {
+    return {
+      _row: FIRST_DATA_ROW + index,
+      FECHA: normalizeDate_(row[0]),
+      'DÍA': clean_(row[1]),
+      HORA: normalizeTime_(row[2]),
+      MODALIDAD: clean_(row[3]),
+      ACTIVIDAD: clean_(row[4]),
+      LUGAR: clean_(row[5]),
+      PARTICIPANTES: clean_(row[6]),
+      ESTADO: clean_(row[7])
+    };
+  }).filter(function(event) {
+    return event.FECHA && event.ACTIVIDAD;
+  });
+
+  return {
+    ok: true,
+    action: 'listar',
+    schema: 'agenda-live-v1',
+    version: BACKEND_VERSION,
+    eventos: events
+  };
+}
+
 function createEvent_(sheet, params) {
   validateRequired_(params, ['fecha', 'actividad']);
   const nextRow = Math.max(sheet.getLastRow() + 1, FIRST_DATA_ROW);
 
-  copyPreviousRowFormat_(sheet, nextRow);
   sheet.getRange(nextRow, 1, 1, COLUMN_COUNT).setValues([buildRow_(params)]);
 
   SpreadsheetApp.flush();
@@ -105,9 +154,9 @@ function updateEvent_(sheet, params) {
 
   const row = resolveRow_(sheet, {
     fila: params.fila,
-    fecha: params.fechaOriginal || params.fecha,
-    hora: params.horaOriginal || params.hora,
-    actividad: params.actividadOriginal || params.actividad
+    fecha: originalParam_(params, 'fechaOriginal', 'fecha'),
+    hora: originalParam_(params, 'horaOriginal', 'hora'),
+    actividad: originalParam_(params, 'actividadOriginal', 'actividad')
   }, true);
 
   sheet.getRange(row, 1, 1, COLUMN_COUNT).setValues([buildRow_(params)]);
@@ -146,6 +195,15 @@ function buildRow_(params) {
   ];
 }
 
+
+function hasOwnParam_(params, key) {
+  return Object.prototype.hasOwnProperty.call(params || {}, key);
+}
+
+function originalParam_(params, originalKey, currentKey) {
+  return hasOwnParam_(params, originalKey) ? params[originalKey] : params[currentKey];
+}
+
 function resolveRow_(sheet, params, verifyIdentity) {
   const lastRow = sheet.getLastRow();
   if (lastRow < FIRST_DATA_ROW) throw new Error('La agenda no contiene actividades.');
@@ -167,22 +225,37 @@ function resolveRow_(sheet, params, verifyIdentity) {
   const targetTime = normalizeTime_(params.hora);
   const targetActivity = normalizeText_(params.actividad);
 
+  const exactMatches = [];
+  const relaxedMatches = [];
+
   for (let index = 0; index < values.length; index++) {
     const rowDate = normalizeDate_(values[index][0]);
     const rowTime = normalizeTime_(values[index][2]);
     const rowActivity = normalizeText_(values[index][4]);
+    const rowNumber = FIRST_DATA_ROW + index;
 
-    if (
-      rowDate === targetDate &&
-      rowTime === targetTime &&
-      rowActivity === targetActivity
-    ) {
-      return FIRST_DATA_ROW + index;
+    if (rowDate === targetDate && rowActivity === targetActivity) {
+      relaxedMatches.push(rowNumber);
+      if (rowTime === targetTime) exactMatches.push(rowNumber);
     }
   }
 
+  if (exactMatches.length === 1) return exactMatches[0];
+
+  // Rescate seguro: si fecha + actividad identifican una sola fila,
+  // permite editar aunque la hora haya cambiado externamente o estuviera vacía.
+  if (exactMatches.length === 0 && relaxedMatches.length === 1) {
+    return relaxedMatches[0];
+  }
+
+  if (exactMatches.length > 1 || relaxedMatches.length > 1) {
+    throw new Error(
+      'Hay más de una actividad coincidente. Actualiza la agenda y vuelve a seleccionar la actividad.'
+    );
+  }
+
   throw new Error(
-    'No fue posible localizar la actividad en la planilla. Actualiza la agenda e intenta nuevamente.'
+    'No fue posible localizar la actividad en la planilla. La agenda se actualizará para evitar modificar una fila incorrecta.'
   );
 }
 
@@ -262,8 +335,8 @@ function updateHoliday_(params) {
   const sheet = ensureHolidaySheet_();
   const row = resolveHolidayRow_(sheet, {
     fila: params.fila,
-    fecha: params.fechaOriginal || params.fecha,
-    nombre: params.nombreOriginal || params.nombre
+    fecha: originalParam_(params, 'fechaOriginal', 'fecha'),
+    nombre: originalParam_(params, 'nombreOriginal', 'nombre')
   });
 
   assertHolidayEditable_(sheet, row);
@@ -856,12 +929,6 @@ function getAgendaSheet_() {
   return sheet;
 }
 
-function copyPreviousRowFormat_(sheet, targetRow) {
-  if (targetRow <= FIRST_DATA_ROW) return;
-
-  sheet.getRange(targetRow - 1, 1, 1, COLUMN_COUNT)
-    .copyFormatToRange(sheet, 1, COLUMN_COUNT, targetRow, targetRow);
-}
 
 function validateRequired_(params, fields) {
   fields.forEach(function(field) {
@@ -878,7 +945,7 @@ function normalizeDate_(value) {
   ) {
     return Utilities.formatDate(
       value,
-      Session.getScriptTimeZone() || 'America/Santiago',
+      AGENDA_TIME_ZONE,
       'dd/MM/yyyy'
     );
   }

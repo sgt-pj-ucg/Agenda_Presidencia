@@ -1,6 +1,5 @@
 
-// Agenda Presidencia · revisión automática de feriados nacionales oficiales
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTS475HlSXSv9KO7xSo8MnDd8fMBbz93oLJAXKRJGpIWjG88nNF2RX1dJwBq3Evw47kmxeGnKJgRQIk/pub?output=csv';
+// Agenda Presidencia · sincronización en vivo y ausencia estricta por ESTADO
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTAbGCdAkQdQ1hd5C8lx3lS1ONOMZIRWsVIF9mJCweWPBjNt2VEiPM_4GUmr4qQx7riA/exec';
 
 let allEvents = [];
@@ -31,10 +30,6 @@ const FIXED_TABS = [
   { id:'semana', label:'Semana', icon:'📆' },
 ];
 
-const SPECIAL_KEYWORDS = [
-  'permiso','permisos','vacación','vacacion','vacaciones','feriado legal',
-  'curso','cursos','capacitación','capacitacion','diplomado','academia judicial'
-];
 
 const STATUS_OPTIONS = [
   {s:'Confirmada', color:'#78bba3', dot:'#4f9c83', icon:'✓'},
@@ -79,6 +74,23 @@ function parseCSV(text) {
     obj.ESTADO=normalizeStatus(obj.ESTADO);
     return obj;
   }).filter(e=>e.FECHA&&e.ACTIVIDAD);
+}
+
+
+function normalizeLiveEvent(event){
+  const obj={...(event||{})};
+  obj._row=Number(obj._row)||0;
+  obj.FECHA=normalizeDateKey(obj.FECHA);
+  obj.HORA=normalizeTimeValue(obj.HORA);
+  obj.MODALIDAD=normalizeModality(obj.MODALIDAD);
+  obj.ESTADO=normalizeStatus(obj.ESTADO);
+  return obj;
+}
+
+function normalizeLiveEvents(events){
+  return (Array.isArray(events)?events:[])
+    .map(normalizeLiveEvent)
+    .filter(event=>event._row>=2&&event.FECHA&&event.ACTIVIDAD);
 }
 
 function normalizeDateKey(value) {
@@ -165,8 +177,7 @@ function eventKey(event) {
 function getStatus(event) { return normalizeStatus(event.ESTADO); }
 
 function isSpecialActivity(event) {
-  const text=[event.TIPO,event.CATEGORIA,event.ACTIVIDAD].filter(Boolean).join(' ').toLowerCase();
-  return SPECIAL_KEYWORDS.some(keyword=>text.includes(keyword));
+  return getStatus(event)==='Ausente';
 }
 
 function formatTime(value) {
@@ -471,7 +482,7 @@ function updateHeaderStats() {
   const confirmed=todayEvents.filter(event=>getStatus(event)==='Confirmada').length;
   const toConfirm=todayEvents.filter(event=>getStatus(event)==='Por Confirmar').length;
   const pending=todayEvents.filter(event=>getStatus(event)==='Pendiente').length;
-  const absent=todayEvents.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event)).length;
+  const absent=todayEvents.filter(event=>getStatus(event)==='Ausente').length;
   document.getElementById('headerStats').innerHTML=`
     <div class="stat-chip primary"><span class="dot" style="background:#4f9c83"></span>${todayEvents.length} hoy</div>
     ${holiday?`<div class="stat-chip holiday"><span class="dot"></span>${escapeHTML(holiday.name)}</div>`:''}
@@ -488,7 +499,7 @@ function updateExecutiveBrief(today,todayEvents) {
   const greeting=hour<12?'Buenos días':hour<20?'Buenas tardes':'Buenas noches';
   const active=todayEvents.filter(event=>getStatus(event)!=='Cancelada').slice().sort(compareEventsChronologically);
   const timed=active.filter(event=>timeToMin(event.HORA)!==null);
-  const absences=active.filter(event=>getStatus(event)==='Ausente'||isSpecialActivity(event));
+  const absences=active.filter(event=>getStatus(event)==='Ausente');
   const next=nextTimedEventForToday();
   const conflicts=sameTimeConflicts(active);
   const pending=active.filter(event=>['Por Confirmar','Pendiente'].includes(getStatus(event))).length;
@@ -504,7 +515,7 @@ function updateExecutiveBrief(today,todayEvents) {
     else if(active.length) subtitle=`Hoy es ${holiday.name}. Tiene ${count} registrada${active.length===1?'':'s'}.`;
     else subtitle=`Hoy es feriado nacional: ${holiday.name}. No hay actividades agendadas.`;
   }else if(active.length===absences.length&&absences.length){
-    subtitle='La jornada está registrada como ausencia, permiso, curso o feriado legal.';
+    subtitle='La jornada está registrada como ausencia de la Presidenta.';
   }else if(active.length){
     const count=`${active.length} ${active.length===1?'actividad':'actividades'}`;
     if(next){
@@ -547,7 +558,7 @@ function renderCard(event) {
     ? `<span class="temporal-badge next"><span class="temporal-dot"></span><strong>Próxima</strong><em>${escapeHTML(temporal.label)}</em></span>`
     : temporal.state==='past'?`<span class="temporal-badge past">Finalizada</span>`:'';
   const banner=special
-    ? `<div class="mode-banner mode-special"><span>AUSENCIA · PERMISO · CURSO · FERIADO LEGAL</span>${temporalBadge}</div>`
+    ? `<div class="mode-banner mode-special"><span>AUSENCIA DE LA PRESIDENTA</span>${temporalBadge}</div>`
     : `<div class="mode-banner mode-${modality.className}"><span class="mode-copy"><span class="mode-icon">${modality.icon}</span><span>${modality.label}</span></span>${temporalBadge}</div>`;
   return `
     <article class="event-card ${modality.className} ${special?'special':''} ${status==='Cancelada'?'cancelada':''} ${temporal.state?`temporal-${temporal.state}`:''}" data-key="${key}" data-row="${event._row||''}">
@@ -610,8 +621,7 @@ function formatDateKey(date){
 }
 
 function isCalendarAbsenceEvent(event){
-  const status=getStatus(event);
-  return status==='Ausente'||(status!=='Cancelada'&&isSpecialActivity(event));
+  return getStatus(event)==='Ausente';
 }
 
 function dayStatusSegments(dayEvents,{isHoliday=false}={}){
@@ -1341,12 +1351,13 @@ document.getElementById('btnGuardar').addEventListener('click',async()=>{
   try {
     if (editingEvent) {
       const original={...editingEvent};
-      await sendScriptAction('editar',{
+      const result=await sendScriptAction('editar',{
         fila:original._row,fechaOriginal:original.FECHA,horaOriginal:original.HORA,actividadOriginal:original.ACTIVIDAD,
         fecha:data.FECHA,dia:data['DÍA'],hora:data.HORA,modalidad:data.MODALIDAD,actividad:data.ACTIVIDAD,
         lugar:data.LUGAR,participantes:data.PARTICIPANTES,estado:data.ESTADO
       });
       Object.assign(editingEvent,data);
+      editingEvent._row=Number(result.row)||editingEvent._row;
       haptic([18,35,18]); showToast('✓ Actividad actualizada');
     } else {
       const result=await sendScriptAction('nueva',{
@@ -1564,7 +1575,7 @@ function searchEvents(query) {
   const modality=rawQuery.includes('telem')||rawQuery.includes('virtual')?'Telemática':rawQuery.includes('híbr')||rawQuery.includes('hibr')?'Híbrida':rawQuery.includes('presencial')?'Presencial':null;
   if(modality) base=base.filter(event=>normalizeModality(event.MODALIDAD)===modality);
 
-  const status=rawQuery.includes('por confirmar')?'Por Confirmar':rawQuery.includes('pendiente')?'Pendiente':rawQuery.includes('ausente')||rawQuery.includes('permiso')?'Ausente':rawQuery.includes('cancelad')?'Cancelada':rawQuery.includes('confirmad')?'Confirmada':null;
+  const status=rawQuery.includes('por confirmar')?'Por Confirmar':rawQuery.includes('pendiente')?'Pendiente':rawQuery.includes('ausente')?'Ausente':rawQuery.includes('cancelad')?'Cancelada':rawQuery.includes('confirmad')?'Confirmada':null;
   if(status) base=base.filter(event=>status==='Ausente'?isCalendarAbsenceEvent(event):getStatus(event)===status);
 
   const commandWords=['muéstrame','muestrame','mostrar','muestra','qué','que','tengo','agenda','actividad','actividades','para','del','de','el','la','las','los','esta','este','buscar','busca','ver'];
@@ -1996,22 +2007,32 @@ async function loadData({silent=false}={}) {
         {FECHA:key(0),'DÍA':'Hoy',HORA:'12:30',MODALIDAD:'Híbrida',ACTIVIDAD:'Pleno extraordinario',LUGAR:'Salón de Pleno',PARTICIPANTES:'Ministras y ministros',ESTADO:'Por Confirmar',_row:3},
         {FECHA:key(0),'DÍA':'Hoy',HORA:'16:00',MODALIDAD:'Telemática',ACTIVIDAD:'Reunión con administración zonal',LUGAR:'Enlace institucional',PARTICIPANTES:'Administración',ESTADO:'Confirmada',_row:4},
         {FECHA:key(1),'DÍA':'Mañana',HORA:'10:00',MODALIDAD:'Telemática',ACTIVIDAD:'Audiencia protocolar',LUGAR:'Enlace institucional',PARTICIPANTES:'Autoridades regionales',ESTADO:'Pendiente',_row:5},
-        {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Feriado legal de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:5},
-        {FECHA:key(4),'DÍA':'',HORA:'15:30',MODALIDAD:'Presencial',ACTIVIDAD:'Ceremonia de juramento',LUGAR:'Tercera Sala',PARTICIPANTES:'Invitados',ESTADO:'Confirmada',_row:6}
+        {FECHA:key(2),'DÍA':'',HORA:'',MODALIDAD:'Otro',ACTIVIDAD:'Ausencia de la Presidenta',LUGAR:'',PARTICIPANTES:'',ESTADO:'Ausente',_row:6}
       ];
       lastSuccessfulLoadAt=Date.now();
       updateHeaderStats();buildTabs();render();dismissLaunchScreen();return;
     }
-    const response=await fetch(`${CSV_URL}&t=${Date.now()}`,{cache:'no-store'});
-    if(!response.ok) throw new Error('No fue posible cargar la planilla');
-    const text=await response.text();
-    allEvents=parseCSV(text);
+
+    const payload=await sendScriptAction('listar');
+    if(payload?.schema!=='agenda-live-v1'||!Array.isArray(payload?.eventos)){
+      throw new Error('La implementación de Apps Script no corresponde a la versión de sincronización en vivo.');
+    }
+
+    allEvents=normalizeLiveEvents(payload.eventos);
     lastSuccessfulLoadAt=Date.now();
-    updateHeaderStats();buildTabs();render();dismissLaunchScreen();
+    updateHeaderStats();
+    buildTabs();
+    render();
+    dismissLaunchScreen();
     if(silent) showToast('↻ Agenda sincronizada');
   } catch(error) {
     dismissLaunchScreen();
-    if(!silent) document.getElementById('content').innerHTML='<div class="empty"><div class="icon">⚠️</div><p>Error al cargar.<br>Verifica la conexión.</p></div>';
+    console.error('Agenda live sync:',error);
+    if(!silent){
+      document.getElementById('content').innerHTML=`<div class="empty"><div class="icon">⚠️</div><p>No fue posible sincronizar la agenda en vivo.<br><span style="font-size:.85em">${escapeHTML(error.message||'Verifica Apps Script y la conexión.')}</span></p></div>`;
+    }else{
+      showToast(`⚠️ ${error.message||'No fue posible sincronizar'}`);
+    }
   }
 }
 
